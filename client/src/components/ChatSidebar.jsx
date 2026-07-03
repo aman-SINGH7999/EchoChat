@@ -1,0 +1,77 @@
+import React from 'react';
+import { List, ListItem, ListItemButton, ListItemAvatar, ListItemText, Avatar, Box, Badge, Typography } from '@mui/material';
+import moment from 'moment';
+
+function ChatSidebar({ chats, selectedChat, onSelectChat, currentUserId }) {
+  const formatTime = (date) => {
+    return moment(date).fromNow();
+  };
+
+  return (
+    <List sx={{ p: 0 }}>
+      {chats && chats.length > 0 ? (
+        chats.map((chat) => {
+          const lastMessage = chat.messages && chat.messages[0];
+          const otherMember = chat.members?.find(m => m.user_id !== currentUserId);
+
+          const chatName = chat.chat_name || otherMember?.user?.username;
+          const chatAvatar = chat.room_image || otherMember?.user?.userprofile;
+          const isOnline = otherMember?.user?.isOnline;
+
+          return (
+            <ListItem
+              key={chat.id}
+              disablePadding
+              sx={{
+                bgcolor: selectedChat?.id === chat.id ? '#f0f0f0' : 'transparent',
+                '&:hover': { bgcolor: '#f9f9f9' }
+              }}
+            >
+              <ListItemButton onClick={() => onSelectChat(chat)}>
+                <ListItemAvatar>
+                  <Badge
+                    overlap="circular"
+                    anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+                    variant="dot"
+                    sx={{
+                      '& .MuiBadge-badge': {
+                        backgroundColor: isOnline ? '#44b700' : '#bdbdbd'
+                      }
+                    }}
+                  >
+                    <Avatar src={chatAvatar} alt={chatName}>
+                      {chatName?.charAt(0).toUpperCase()}
+                    </Avatar>
+                  </Badge>
+                </ListItemAvatar>
+                <ListItemText
+                  primary={
+                    <Typography variant="subtitle1" noWrap>
+                      {chatName}
+                    </Typography>
+                  }
+                  secondary={
+                    <Box>
+                      <Typography variant="body2" noWrap color="textSecondary">
+                        {lastMessage ? (lastMessage.sender?.username + ': ' + lastMessage.message_text) : 'No messages yet'}
+                      </Typography>
+                      <Typography variant="caption" color="textSecondary">
+                        {lastMessage ? formatTime(lastMessage.createdAt) : ''}
+                      </Typography>
+                    </Box>
+                  }
+                />
+              </ListItemButton>
+            </ListItem>
+          );
+        })
+      ) : (
+        <ListItem>
+          <ListItemText primary="No chats yet. Start a conversation!" />
+        </ListItem>
+      )}
+    </List>
+  );
+}
+
+export default ChatSidebar;
