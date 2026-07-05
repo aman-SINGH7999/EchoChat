@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import {
   Container,
   TextField,
@@ -13,8 +13,10 @@ import {
   Alert,
   Grid
 } from '@mui/material';
+import { ArrowBack as ArrowBackIcon } from '@mui/icons-material';
 import { logout, setUser } from '../redux/slices/authSlice';
-import { userAPI } from '../services/api';
+import { userAPI, authAPI } from '../services/api';
+import { disconnectSocket } from '../services/socket';
 
 function ProfilePage() {
   const dispatch = useDispatch();
@@ -83,13 +85,24 @@ function ProfilePage() {
     }
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      await authAPI.logout();       
+    } catch (error) {
+      console.error('Logout API error:', error);
+    }
+    disconnectSocket();             
     dispatch(logout());
     navigate('/login');
   };
 
   return (
     <Container maxWidth="md" sx={{ py: 4 }}>
+      <Box sx={{ mb: 2 }}>
+        <Link to="/chats" style={{ textDecoration: 'none', color: '#2196F3', display: 'flex', alignItems: 'center', gap: 4 }}>
+          <ArrowBackIcon fontSize="small" /> Back to Chats
+        </Link>
+      </Box>
       <Card sx={{ p: 4 }}>
         <Box textAlign="center" sx={{ mb: 4 }}>
           <Avatar

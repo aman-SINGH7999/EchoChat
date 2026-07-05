@@ -201,12 +201,10 @@ exports.resetPassword = async (req, res) => {
 exports.logout = async (req, res) => {
   try {
     const userId = req.user.id;
-    
     const user = await User.findByPk(userId);
     if (user) {
       await user.update({ isOnline: false, lastSeen: new Date() });
     }
-
     res.json({ message: 'Logged out successfully' });
   } catch (error) {
     console.error(error);
