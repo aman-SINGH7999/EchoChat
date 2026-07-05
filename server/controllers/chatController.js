@@ -2,6 +2,155 @@ const { ChatRoom, ChatMessage, ChatMember, ChatNotification, User, Reaction, Mes
 const { Op } = require('sequelize');
 const { getOnlineUsers, joinUserToRoom } = require('../socket/socketHandler');
 
+exports.sendMessageUnified = async (req, res) => {
+  const userId = req.user.id;
+  const { chatId, otherUserId, message_text, message_type = 'text', file_id = null, reply_to = null } = req.body;
+
+  if (!message_text && !file_id) {
+    return res.status(400).json({ message: 'Message content or file is required' });
+  }
+
+  if (!chatId && !otherUserId) {
+    return res.status(400).json({ message: 'chatId or otherUserId is required' });
+  }
+
+  // YAHI HAI MAIN FIX — pura chat-create + message-create ek transaction me
+  const t = await ChatRoom.sequelize.transaction();
+
+  try {
+    let chat;
+    let isNewChat = false;
+
+    if (chatId) {
+      // existing chat me message bhejna hai
+      chat = await ChatRoom.findByPk(chatId, { transaction: t });
+      if (!chat) {
+        await t.rollback();
+        return res.status(404).json({ message: 'Chat not found' });
+      }
+    } else {
+      // naya private chat, agar zarurat pade to
+      if (userId === parseInt(otherUserId)) {
+        await t.rollback();
+        return res.status(400).json({ message: 'Cannot create chat with yourself' });
+      }
+
+      const existing = await ChatRoom.findOne({
+        where: { chat_type: 'private' },
+        include: [{ model: ChatMember, as: 'members', where: { user_id: [userId, parseInt(otherUserId)] } }],
+        transaction: t,
+        lock: t.LOCK.UPDATE // race-condition-safe: dono taraf se same time pe bheja gaya first msg duplicate chat na banaye
+      });
+
+      if (existing && existing.members.length >= 2) {
+        chat = existing;
+      } else {
+        chat = await ChatRoom.create({ chat_type: 'private', created_by: userId }, { transaction: t });
+        await ChatMember.create({ chat_id: chat.id, user_id: userId, role: 'admin' }, { transaction: t });
+        await ChatMember.create({ chat_id: chat.id, user_id: parseInt(otherUserId), role: 'admin' }, { transaction: t });
+        isNewChat = true;
+      }
+    }
+
+    const existingMsgCount = await ChatMessage.count({
+      where: { chat_id: chat.id, deleted_at: null },
+      transaction: t
+    });
+    const isFirstMessage = existingMsgCount === 0;
+
+    const message = await ChatMessage.create({
+      chat_id: chat.id,
+      sender_id: userId,
+      message_text,
+      message_type,
+      file_id,
+      reply_to
+    }, { transaction: t });
+
+    await ChatRoom.update(
+      { last_message_id: message.id },
+      { where: { id: chat.id }, transaction: t }
+    );
+
+    const chatMembers = await ChatMember.findAll({
+      where: { chat_id: chat.id, user_id: { [Op.ne]: userId } },
+      transaction: t
+    });
+
+    for (const member of chatMembers) {
+      await ChatNotification.create({
+        user_id: member.user_id,
+        message_id: message.id,
+        chat_id: chat.id,
+        notification_type: 'new_message'
+      }, { transaction: t });
+
+      await MessageStatus.create({
+        message_id: message.id,
+        user_id: member.user_id,
+        status: 'sent'
+      },{ transaction: t });
+    }
+
+    // sab kuch theek hai — ab commit karo. Agar upar kahin bhi error aaya, ye line kabhi nahi chalegi
+    // aur DB me kuch bhi save nahi hoga (poora chat + message rollback)
+    await t.commit();
+
+    // COMMIT ke BAAD hi socket/notification kaam karo (transaction ke bahar)
+    const messageWithDetails = await ChatMessage.findByPk(message.id, {
+      include: [{ model: User, as: 'sender', attributes: ['id', 'username', 'userprofile'] }]
+    });
+
+    const io = req.app.get('io');
+    const onlineUsers = getOnlineUsers();
+
+    if (isNewChat || isFirstMessage) {
+      const fullChat = await ChatRoom.findByPk(chat.id, {
+        include: [
+          { model: ChatMember, as: 'members', include: [{ model: User, as: 'user', attributes: ['id', 'username', 'userprofile', 'isOnline'] }] },
+          {
+            model: ChatMessage,
+            as: 'messages',
+            limit: 1,
+            order: [['createdAt', 'DESC']],
+            include: [{ model: User, as: 'sender', attributes: ['id', 'username', 'userprofile'] }]
+          }
+        ]
+      });
+
+      chatMembers.forEach(member => {
+        joinUserToRoom(io, member.user_id, chat.id);
+        const socketId = onlineUsers[member.user_id];
+        if (socketId) {
+          io.to(socketId).emit('new_chat', fullChat);
+        }
+      });
+
+      return res.status(201).json({
+        message: 'Message sent successfully',
+        data: messageWithDetails,
+        chat: fullChat,
+        isNewChat
+      });
+    }
+
+    chatMembers.forEach(member => {
+      joinUserToRoom(io, member.user_id, chat.id);
+    });
+
+    res.status(201).json({
+      message: 'Message sent successfully',
+      data: messageWithDetails,
+      chat,
+      isNewChat: false
+    });
+  } catch (error) {
+    await t.rollback(); // koi bhi step fail hua to poora undo — na chat banega, na message
+    console.error(error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
 exports.createPrivateChat = async (req, res) => {
   try {
     const userId = req.user.id;
@@ -156,22 +305,9 @@ exports.getMessages = async (req, res) => {
     const messages = await ChatMessage.findAll({
       where: { chat_id: chatId, deleted_at: null },
       include: [
-        {
-          model: User,
-          as: 'sender',
-          attributes: ['id', 'username', 'userprofile']
-        },
-        {
-          model: Reaction,
-          as: 'reactions',
-          include: [
-            {
-              model: User,
-              as: 'user',
-              attributes: ['id', 'username']
-            }
-          ]
-        }
+        { model: User, as: 'sender', attributes: ['id', 'username', 'userprofile'] },
+        { model: Reaction, as: 'reactions', include: [{ model: User, as: 'user', attributes: ['id', 'username'] }] },
+        { model: MessageStatus, as: 'statuses' }   // <-- NAYA
       ],
       order: [['createdAt', 'DESC']],
       limit: parseInt(limit),
@@ -220,6 +356,12 @@ exports.sendMessage = async (req, res) => {
         message_id: message.id,
         chat_id: chatId,
         notification_type: 'new_message'
+      });
+
+      await MessageStatus.create({
+        message_id: message.id,
+        user_id: member.user_id,
+        status: 'sent'
       });
     }
 
@@ -312,6 +454,47 @@ exports.addReaction = async (req, res) => {
       message: 'Reaction added successfully',
       reaction
     });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+
+exports.markMessagesRead = async (req, res) => {
+  try {
+    const { chatId } = req.params;
+    const userId = req.user.id;
+
+    // wo saare messages jo maine nahi bheje (doosre ne bheje hain)
+    const unreadMessages = await ChatMessage.findAll({
+      where: { chat_id: chatId, sender_id: { [Op.ne]: userId }, deleted_at: null }
+    });
+
+    const messageIds = unreadMessages.map(m => m.id);
+    if (messageIds.length === 0) {
+      return res.json({ message: 'No messages to mark', messageIds: [] });
+    }
+
+    for (const msgId of messageIds) {
+      const [status] = await MessageStatus.findOrCreate({
+        where: { message_id: msgId, user_id: userId },
+        defaults: { status: 'read', read_at: new Date() }
+      });
+      if (status.status !== 'read') {
+        await status.update({ status: 'read', read_at: new Date() });
+      }
+    }
+
+    // sender ko real-time batao ki unke message read ho gaye — double tick ke liye
+    const io = req.app.get('io');
+    io.to(`chat_${chatId}`).emit('messages_read', {
+      chatId: parseInt(chatId),
+      readerId: userId,
+      messageIds
+    });
+
+    res.json({ message: 'Messages marked as read', messageIds });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Server error', error: error.message });

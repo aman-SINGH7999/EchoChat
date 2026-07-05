@@ -22,7 +22,7 @@ const initializeSocket = (io) => {
     // Join chat room
     socket.on('join_chat', (chatId) => {
       socket.join(`chat_${chatId}`);
-      console.log(`User joined chat: ${chatId}`);
+      console.log(`Socket ${socket.id} joined chat_${chatId}`);
     });
 
     // Leave chat room
@@ -55,6 +55,7 @@ const initializeSocket = (io) => {
 
     // Read message
     socket.on('message_read', (data) => {
+      console.log('Room members:', io.sockets.adapter.rooms.get(`chat_${chatId}`));
       io.to(`chat_${data.chatId}`).emit('message_read_receipt', {
         messageId: data.messageId,
         userId: data.userId

@@ -56,6 +56,13 @@ function App() {
   const { isAuthenticated, user, token } = useSelector(state => state.auth);
 
   useEffect(() => {
+    if (isAuthenticated && user?.id) {
+      connectSocket();
+      emitUserConnect(user.id);
+    }
+  }, [isAuthenticated, user?.id]);
+
+  useEffect(() => {
     // Check if user is already logged in
     const checkAuth = async () => {
       const token = localStorage.getItem('token');
@@ -65,9 +72,6 @@ function App() {
           const response = await userAPI.getProfile();
           dispatch(setUser(response.data.user));
           
-          // Connect socket
-          connectSocket();
-          emitUserConnect(response.data.user.id);
         } catch (error) {
           console.error('Error fetching profile:', error);
           localStorage.removeItem('token');
@@ -96,6 +100,14 @@ function App() {
           {/* Protected Routes */}
           <Route
             path="/chats"
+            element={
+              <ProtectedRoute>
+                <ChatPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/chats/:chatId?"
             element={
               <ProtectedRoute>
                 <ChatPage />

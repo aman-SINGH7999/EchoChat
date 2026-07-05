@@ -50,9 +50,6 @@ function RegisterPage() {
       dispatch(setToken(token));
       dispatch(setUser(user));
 
-      connectSocket();
-      emitUserConnect(user.id);
-
       navigate('/chats');
     } catch (error) {
       const message = error.response?.data?.message || 'Registration failed';

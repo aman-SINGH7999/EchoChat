@@ -1,16 +1,18 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import {
   Box, Grid, CircularProgress, TextField, InputAdornment, IconButton,
   Avatar, Menu, MenuItem, ListItemIcon, ListItemText, Divider, Typography
 } from '@mui/material';
 import { Search as SearchIcon, Add as AddIcon, Person as PersonIcon, Logout as LogoutIcon } from '@mui/icons-material';
 
-import { setChats, setSelectedChat, addMessage, updateChatPreview, addChat } from '../redux/slices/chatSlice';
+import { setChats, setSelectedChat, addMessage, updateChatPreview, addChat, markMessagesAsRead } from '../redux/slices/chatSlice';
 import { logout } from '../redux/slices/authSlice';
 import { chatAPI, userAPI, authAPI } from '../services/api';
-import { joinChat, leaveChat, onReceiveMessage, offReceiveMessage, onNewChat, offNewChat, disconnectSocket } from '../services/socket';
+import { joinChat, leaveChat, onReceiveMessage, offReceiveMessage, onNewChat, offNewChat, disconnectSocket, onMessagesRead, offMessagesRead } from '../services/socket';
+
+
 
 import ChatSidebar from '../components/ChatSidebar';
 import ChatWindow from '../components/ChatWindow';
@@ -20,6 +22,7 @@ import SearchUsersModal from '../components/SearchUsersModal';
 function ChatPage() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const { chatId } = useParams(); 
   const { chats, selectedChat, messages, loading } = useSelector(state => state.chat);
   const { user } = useSelector(state => state.auth);
   const [searchQuery, setSearchQuery] = useState('');
@@ -27,18 +30,59 @@ function ChatPage() {
   const [openSearchModal, setOpenSearchModal] = useState(false);
   const [anchorEl, setAnchorEl] = useState(null);
 
+  const selectedChatRef = useRef(selectedChat);
+  useEffect(() => {
+    selectedChatRef.current = selectedChat;
+  }, [selectedChat]);
+
   useEffect(() => {
     loadChats();
   }, []);
 
+  // NAYA — jab chats load ho jaayen (ya URL badle), URL wale chatId ko select karo
   useEffect(() => {
-    if (selectedChat) {
-      joinChat(selectedChat.id);
-      return () => {
-        leaveChat(selectedChat.id);
-      };
+    if (!chatId) return;                              // URL me chatId nahi hai to kuch mat karo
+    if (selectedChat?.id === parseInt(chatId)) return; // already sahi chat selected hai
+
+    const chatFromList = chats.find(c => c.id === parseInt(chatId));
+    if (chatFromList) {
+      dispatch(setSelectedChat(chatFromList));
+    } else if (chats.length > 0) {
+      // chats load ho gaye hain par ye chatId list me nahi mila — server se fetch karo
+      chatAPI.getChat(chatId)
+        .then(res => dispatch(setSelectedChat(res.data.chat)))
+        .catch(err => {
+          console.error('Chat not found:', err);
+          navigate('/chats'); // invalid/inaccessible chatId — clean URL pe bhej do
+        });
     }
-  }, [selectedChat]);
+  }, [chatId, chats]);
+
+  // useEffect(() => {
+  //   if (selectedChat && !selectedChat.isTemp) {
+  //     joinChat(selectedChat.id);
+  //     return () => leaveChat(selectedChat.id);
+  //   }
+  // }, [selectedChat]);
+
+  useEffect(() => {
+    if (selectedChat && !selectedChat.isTemp) {
+      joinChat(selectedChat.id);
+      return () => leaveChat(selectedChat.id);
+    }
+  }, [selectedChat?.id, selectedChat?.isTemp]);
+
+  useEffect(() => {
+    const handleMessagesRead = ({ readerId, messageIds, chatId }) => {
+      if (readerId === user.id) return;
+      // FIX — ref.current se hamesha LATEST selectedChat milega, stale closure nahi
+      if (selectedChatRef.current?.id !== chatId) return;
+      dispatch(markMessagesAsRead({ messageIds }));
+    };
+
+    onMessagesRead(handleMessagesRead);
+    return () => offMessagesRead(handleMessagesRead);
+  }, [dispatch, user?.id]);
 
 
   useEffect(() => {
@@ -57,15 +101,14 @@ function ChatPage() {
 
   useEffect(() => {
     const handleReceiveMessage = (data) => {
-
-       if (!user) return;
-      // sender_id se khud ka message skip karo
+      if (!user) return;
       if (data.sender_id === user.id) return;
 
       if (selectedChat && data.chat_id === selectedChat.id) {
         dispatch(addMessage(data));
+        chatAPI.markMessagesRead(selectedChat.id).catch(() => {}); // NAYA — chat open hai to turant read
       }
-      dispatch(updateChatPreview(data)); 
+      dispatch(updateChatPreview(data));
     };
 
     onReceiveMessage(handleReceiveMessage);
@@ -88,25 +131,13 @@ function ChatPage() {
 
   const handleSelectChat = async (chat) => {
     dispatch(setSelectedChat(chat));
+    navigate(`/chats/${chat.id}`);
   };
 
   const handleSearch = async (e) => {
     e.preventDefault();
     if (searchQuery.trim()) {
       setOpenSearchModal(true);
-    }
-  };
-
-  const handleCreatePrivateChat = async (userId) => {
-    try {
-      const response = await chatAPI.createPrivateChat(userId);
-      const newChat = response.data.chat;
-      dispatch(setChats([newChat, ...chats]));
-      dispatch(setSelectedChat(newChat));
-      setOpenSearchModal(false);
-      setSearchQuery('');
-    } catch (error) {
-      console.error('Error creating chat:', error);
     }
   };
 
@@ -128,6 +159,38 @@ function ChatPage() {
     disconnectSocket();             // socket bhi cleanly disconnect karo
     dispatch(logout());
     navigate('/login');
+  };
+
+
+  // UPDATE — search se existing chat select ho to URL me daalo; naya (temp) chat ho to /chats pe hi raho
+  const handleSelectSearchedUser = (selectedUser) => {
+    const existingChat = chats.find(chat =>
+      chat.chat_type === 'private' &&
+      chat.members?.some(m => m.user_id === selectedUser.id)
+    );
+
+    if (existingChat) {
+      dispatch(setSelectedChat(existingChat));
+      navigate(`/chats/${existingChat.id}`);   // NAYA
+    } else {
+      const tempChat = {
+        id: null,
+        isTemp: true,
+        chat_type: 'private',
+        chat_name: null,
+        room_image: null,
+        members: [
+          { user_id: user.id, user },
+          { user_id: selectedUser.id, user: selectedUser }
+        ],
+        messages: []
+      };
+      dispatch(setSelectedChat(tempChat));
+      navigate('/chats');   // temp chat ke liye koi id nahi, plain /chats
+    }
+
+    setOpenSearchModal(false);
+    setSearchQuery('');
   };
 
   return (
@@ -219,7 +282,7 @@ function ChatPage() {
         open={openSearchModal}
         onClose={() => setOpenSearchModal(false)}
         query={searchQuery}
-        onSelectUser={handleCreatePrivateChat}
+        onSelectUser={handleSelectSearchedUser}
       />
     </Box>
   );

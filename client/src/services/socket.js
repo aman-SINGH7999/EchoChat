@@ -3,8 +3,17 @@ import io from 'socket.io-client';
 const SOCKET_URL = import.meta.env.VITE_REACT_APP_SOCKET_URL || 'http://localhost:5001';
 
 let socket = null;
+let joinedRooms = new Set();
 
 export const connectSocket = () => {
+  if (socket && socket.connected) {
+    return socket; // already connected — rooms disturb mat karo
+  }
+
+  if (socket) {
+    socket.disconnect();
+  }
+
   socket = io(SOCKET_URL, {
     reconnection: true,
     reconnectionDelay: 1000,
@@ -13,13 +22,13 @@ export const connectSocket = () => {
     transports: ['websocket']
   });
 
-  socket.on('connect', () => {
-    console.log('Socket connected');
+  socket.on('connect', () => console.log('Socket connected'));
+
+  socket.on('reconnect', () => {
+    joinedRooms.forEach(chatId => socket.emit('join_chat', chatId));
   });
 
-  socket.on('disconnect', () => {
-    console.log('Socket disconnected');
-  });
+  socket.on('disconnect', () => console.log('Socket disconnected'));
 
   return socket;
 };
@@ -35,6 +44,7 @@ export const disconnectSocket = () => {
   if (socket) {
     socket.disconnect();
     socket = null;
+    joinedRooms.clear();
   }
 };
 
@@ -45,11 +55,13 @@ export const emitUserConnect = (userId) => {
 
 export const joinChat = (chatId) => {
   const socket = getSocket();
+  joinedRooms.add(chatId);
   socket.emit('join_chat', chatId);
 };
 
 export const leaveChat = (chatId) => {
   const socket = getSocket();
+  joinedRooms.delete(chatId);
   socket.emit('leave_chat', chatId);
 };
 
@@ -116,4 +128,14 @@ export const onNewChat = (callback) => {
 export const offNewChat = (callback) => {
   const socket = getSocket();
   socket.off('new_chat', callback);
+};
+
+export const onMessagesRead = (callback) => {
+  const socket = getSocket();
+  socket.on('messages_read', callback);
+};
+
+export const offMessagesRead = (callback) => {
+  const socket = getSocket();
+  socket.off('messages_read', callback);
 };

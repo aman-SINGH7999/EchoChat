@@ -43,13 +43,15 @@ export const userAPI = {
 export const chatAPI = {
   createPrivateChat: (otherUserId) => api.post('/chats/private-chat', { otherUserId }),
   createGroupChat: (data) => api.post('/chats/group-chat', data),
+  sendMessageUnified: (data) => api.post('/chats/messages', data),
   getChats: () => api.get('/chats'),
   getChat: (chatId) => api.get(`/chats/${chatId}`),
   getMessages: (chatId, page = 1, limit = 50) =>
     api.get(`/chats/${chatId}/messages`, { params: { page, limit } }),
   sendMessage: (chatId, data) => api.post(`/chats/${chatId}/messages`, data),
   deleteMessage: (messageId) => api.delete(`/chats/messages/${messageId}`),
-  addReaction: (messageId, emoji) => api.post(`/chats/messages/${messageId}/reactions`, { emoji })
+  addReaction: (messageId, emoji) => api.post(`/chats/messages/${messageId}/reactions`, { emoji }),
+  markMessagesRead: (chatId) => api.put(`/chats/${chatId}/messages/read`)
 };
 
 export default api;

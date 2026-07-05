@@ -49,7 +49,7 @@ function SearchUsersModal({ open, onClose, query, onSelectUser }) {
   };
 
   const handleSelectUser = (user) => {
-    onSelectUser(user.id);
+    onSelectUser(user);
     setSearchResults([]);
   };
 

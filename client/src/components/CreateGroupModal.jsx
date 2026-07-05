@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import {
   Dialog,
@@ -27,27 +27,43 @@ function CreateGroupModal({ open, onClose }) {
   const [groupName, setGroupName] = useState('');
   const [selectedMembers, setSelectedMembers] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searching, setSearching] = useState(false);
 
   const handleSearch = async (query) => {
-    setSearchQuery(query);
     if (query.trim().length < 2) {
       setSearchResults([]);
       return;
     }
 
     setSearching(true);
+
     try {
       const response = await userAPI.searchUsers(query);
-      setSearchResults(response.data.users.filter(u => u.id !== user.id));
+
+      setSearchResults(
+        response.data.users.filter(u => u.id !== user.id)
+      );
     } catch (error) {
       console.error('Error searching users:', error);
     } finally {
       setSearching(false);
     }
   };
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedQuery(searchQuery);
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  useEffect(() => {
+    handleSearch(debouncedQuery);
+  }, [debouncedQuery]);
 
   const handleToggleMember = (member) => {
     setSelectedMembers(prev =>
@@ -106,9 +122,8 @@ function CreateGroupModal({ open, onClose }) {
             fullWidth
             label="Add Members"
             value={searchQuery}
-            onChange={(e) => handleSearch(e.target.value)}
+            onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search users..."
-            disabled={searching}
           />
 
           {/* Selected Members */}

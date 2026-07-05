@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
+import { useNavigate } from 'react-router-dom';
 import {
   Box,
   TextField,
@@ -17,13 +18,16 @@ import {
 import { Send as SendIcon, AttachFile as AttachFileIcon } from '@mui/icons-material';
 import moment from 'moment';
 
-import { setMessages, addMessage, setLoading, updateChatPreview } from '../redux/slices/chatSlice';
 import { chatAPI } from '../services/api';
-import { notifyTyping, notifyStopTyping, sendMessage as emitSocketMessage } from '../services/socket';
+import { setMessages, addMessage, setLoading, updateChatPreview, addChat, setSelectedChat, replaceMessage, markMessageFailed } from '../redux/slices/chatSlice';
+import { notifyTyping, notifyStopTyping, sendMessage as emitSocketMessage, joinChat } from '../services/socket';
+
+
 
 import MessageBubble from './MessageBubble';
 
 function ChatWindow({ chat }) {
+  const navigate = useNavigate();
   const dispatch = useDispatch();
   const { messages, loading } = useSelector(state => state.chat);
   const { user } = useSelector(state => state.auth);
@@ -35,6 +39,8 @@ function ChatWindow({ chat }) {
   useEffect(() => {
     if (chat?.id) {
       loadMessages();
+    }else {
+      dispatch(setMessages([])); // temp chat — koi purana message nahi
     }
   }, [chat?.id]);
 
@@ -46,11 +52,25 @@ function ChatWindow({ chat }) {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
+  // message ka status decide karo — sirf apne bheje hue messages ke liye
+  const computeStatus = (message, currentUserId) => {
+    if (message.sender_id !== currentUserId) return undefined;
+    const otherStatus = message.statuses?.find(s => s.user_id !== currentUserId);
+    return otherStatus?.status === 'read' ? 'read' : 'sent';
+  };
+
   const loadMessages = async () => {
     dispatch(setLoading(true));
     try {
       const response = await chatAPI.getMessages(chat.id);
-      dispatch(setMessages(response.data.messages.reverse()));
+      const withStatus = response.data.messages.reverse().map(m => ({
+        ...m,
+        status: computeStatus(m, user.id)
+      }));
+      dispatch(setMessages(withStatus));
+
+      // chat khulte hi doosre ke bheje messages read mark karo
+      chatAPI.markMessagesRead(chat.id).catch(() => {});
     } catch (error) {
       console.error('Error loading messages:', error);
     } finally {
@@ -62,39 +82,71 @@ function ChatWindow({ chat }) {
     e.preventDefault();
     if (!messageText.trim()) return;
 
-    try {
-      const response = await chatAPI.sendMessage(chat.id, {
-        message_text: messageText,
-        message_type: 'text'
-      });
-      dispatch(addMessage(response.data.data));
-      dispatch(updateChatPreview(response.data.data)); 
-      // YE LINE MISSING THI — socket ko batao
-      emitSocketMessage(chat.id, response.data.data);
+    const tempId = `temp-${Date.now()}`;
+    const textToSend = messageText;
 
-      setMessageText('');
-      notifyStopTyping(chat.id, user.id);
+    // TURANT UI me clock icon ke saath message dikhao — abhi server ne accept nahi kiya
+    dispatch(addMessage({
+      id: tempId,
+      chat_id: chat.id,
+      sender_id: user.id,
+      sender: { id: user.id, username: user.username, userprofile: user.userprofile },
+      message_text: textToSend,
+      message_type: 'text',
+      createdAt: new Date().toISOString(),
+      status: 'pending',   // CLOCK ICON
+      reactions: []
+    }));
+    setMessageText('');
+
+    try {
+      let payload;
+      if (chat.isTemp) {
+        const otherMember = chat.members.find(m => m.user_id !== user.id);
+        payload = { otherUserId: otherMember.user_id, message_text: textToSend, message_type: 'text' };
+      } else {
+        payload = { chatId: chat.id, message_text: textToSend, message_type: 'text' };
+      }
+
+      const response = chat.isTemp
+        ? await chatAPI.sendMessageUnified(payload)
+        : await chatAPI.sendMessage(chat.id, { message_text: textToSend, message_type: 'text' });
+
+      const newMessage = { ...response.data.data, status: 'sent' }; // SINGLE TICK
+
+      if (chat.isTemp && response.data.chat) {
+        dispatch(addChat(response.data.chat));
+        dispatch(setSelectedChat(response.data.chat));
+        joinChat(response.data.chat.id);
+        navigate(`/chats/${response.data.chat.id}`, { replace: true });
+      }
+
+      const finalChatId = response.data.chat?.id || chat.id;
+
+      dispatch(replaceMessage({ tempId, message: newMessage })); // pending -> sent
+      dispatch(updateChatPreview(newMessage));
+      emitSocketMessage(finalChatId, newMessage);
+
+      notifyStopTyping(finalChatId, user.id);
       setIsTyping(false);
     } catch (error) {
       console.error('Error sending message:', error);
+      dispatch(markMessageFailed(tempId)); // chaho to failed icon bhi dikha sakte ho
     }
   };
 
   const handleInputChange = (e) => {
     setMessageText(e.target.value);
 
-    // Notify typing
+    if (!chat?.id) return; // temp chat me typing-notify ki zarurat nahi
+
     if (!isTyping) {
       notifyTyping(chat.id, user.id, user.username);
       setIsTyping(true);
     }
 
-    // Clear timeout
-    if (typingTimeoutRef.current) {
-      clearTimeout(typingTimeoutRef.current);
-    }
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
 
-    // Set new timeout
     typingTimeoutRef.current = setTimeout(() => {
       notifyStopTyping(chat.id, user.id);
       setIsTyping(false);

@@ -77,6 +77,29 @@ const chatSlice = createSlice({
         chat.messages = [msg];
         state.chats.unshift(chat);
       }
+    },
+    replaceMessage: (state, action) => {
+      const { tempId, message } = action.payload;
+      const index = state.messages.findIndex(m => m.id === tempId);
+      if (index !== -1) {
+        state.messages[index] = message;
+      } else {
+        state.messages.push(message);
+      }
+    },
+    markMessagesAsRead: (state, action) => {
+      const { messageIds } = action.payload;
+      state.messages.forEach(m => {
+        if (messageIds.includes(m.id)) {
+          m.status = 'read';
+        }
+      });
+    },
+    markMessageFailed: (state, action) => {
+      const index = state.messages.findIndex(m => m.id === action.payload);
+      if (index !== -1) {
+        state.messages[index].status = 'failed';
+      }
     }
 
   }
@@ -97,7 +120,10 @@ export const {
   setLoading,
   setError,
   clearError,
-  updateChatPreview
+  updateChatPreview,
+  replaceMessage, 
+  markMessagesAsRead, 
+  markMessageFailed
 } = chatSlice.actions;
 
 export default chatSlice.reducer;

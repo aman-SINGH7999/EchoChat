@@ -39,10 +39,6 @@ function LoginPage() {
       dispatch(setToken(token));
       dispatch(setUser(user));
 
-      // YE ADD KARO — turant socket connect karo
-      connectSocket();
-      emitUserConnect(user.id);
-
       navigate('/chats');
     } catch (error) {
       const message = error.response?.data?.message || 'Login failed';

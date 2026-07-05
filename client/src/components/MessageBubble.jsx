@@ -1,6 +1,6 @@
 import React from 'react';
 import { Box, Paper, Typography, Avatar, Menu, MenuItem, IconButton } from '@mui/material';
-import { MoreVert as MoreVertIcon } from '@mui/icons-material';
+import { MoreVert as MoreVertIcon, AccessTime as PendingIcon, Done as SentIcon, DoneAll as ReadIcon } from '@mui/icons-material';
 import moment from 'moment';
 
 function MessageBubble({ message, isOwn }) {
@@ -58,14 +58,14 @@ function MessageBubble({ message, isOwn }) {
 
         <Typography
           variant="caption"
-          sx={{
-            display: 'block',
-            mt: 0.5,
-            opacity: 0.7,
-            fontSize: '0.7rem'
-          }}
+          sx={{ display: 'flex', alignItems: 'center', gap: 0.3, mt: 0.5, opacity: 0.7, fontSize: '0.7rem' }}
         >
           {moment(message.createdAt).format('HH:mm')}
+
+          {isOwn && message.status === 'pending' && <PendingIcon sx={{ fontSize: 13 }} />}
+          {isOwn && message.status === 'sent' && <SentIcon sx={{ fontSize: 14 }} />}
+          {isOwn && message.status === 'read' && <ReadIcon sx={{ fontSize: 14, color: '#4fc3f7' }} />}
+          {isOwn && message.status === 'failed' && <Typography component="span" sx={{ color: 'red', fontSize: '0.65rem' }}>failed</Typography>}
         </Typography>
 
         {/* Reactions */}
