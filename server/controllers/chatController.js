@@ -2,6 +2,8 @@ const { ChatRoom, ChatMessage, ChatMember, ChatNotification, User, Reaction, Mes
 const { Op } = require('sequelize');
 const { getOnlineUsers, joinUserToRoom } = require('../socket/socketHandler');
 
+const memberUserAttrs = ['id', 'username', 'userprofile', 'isOnline', 'email', 'userphone', 'lastSeen'];
+
 const sendMessageUnified = async (req, res) => {
   const userId = req.user.id;
   const { chatId, otherUserId, message_text, message_type = 'text', file_id = null, reply_to = null } = req.body;
@@ -107,7 +109,7 @@ const sendMessageUnified = async (req, res) => {
     if (isNewChat || isFirstMessage) {
       const fullChat = await ChatRoom.findByPk(chat.id, {
         include: [
-          { model: ChatMember, as: 'members', include: [{ model: User, as: 'user', attributes: ['id', 'username', 'userprofile', 'isOnline'] }] },
+          { model: ChatMember, as: 'members', include: [{ model: User, as: 'user', attributes: memberUserAttrs }] },
           {
             model: ChatMessage,
             as: 'messages',
@@ -175,7 +177,7 @@ const createPrivateChat = async (req, res) => {
 
     const fullChat = await ChatRoom.findByPk(chat.id, {
       include: [
-        { model: ChatMember, as: 'members', include: [{ model: User, as: 'user', attributes: ['id', 'username', 'userprofile', 'isOnline'] }] },
+        { model: ChatMember, as: 'members', include: [{ model: User, as: 'user', attributes: memberUserAttrs }] },
         { model: ChatMessage, as: 'messages', limit: 1, order: [['createdAt', 'DESC']] }
       ]
     });
@@ -211,7 +213,7 @@ const createGroupChat = async (req, res) => {
 
     const fullChat = await ChatRoom.findByPk(chat.id, {
       include: [
-        { model: ChatMember, as: 'members', include: [{ model: User, as: 'user', attributes: ['id', 'username', 'userprofile', 'isOnline'] }] },
+        { model: ChatMember, as: 'members', include: [{ model: User, as: 'user', attributes: memberUserAttrs }] },
         { model: ChatMessage, as: 'messages', limit: 1, order: [['createdAt', 'DESC']] }
       ]
     });
@@ -237,7 +239,7 @@ const getChats = async (req, res) => {
         {
           model: ChatMember,
           as: 'members',
-          include: [{ model: User, as: 'user', attributes: ['id', 'username', 'userprofile', 'isOnline'] }]
+          include: [{ model: User, as: 'user', attributes: memberUserAttrs }]
         },
         {
           model: ChatMessage,
@@ -272,7 +274,7 @@ const getChat = async (req, res) => {
             {
               model: User,
               as: 'user',
-              attributes: ['id', 'username', 'userprofile', 'isOnline']
+              attributes: memberUserAttrs
             }
           ]
         },
@@ -376,7 +378,7 @@ const sendMessage = async (req, res) => {
       // PEHLA MESSAGE — ab jaake doosre members ke sidebar mein chat dikhao
       const fullChat = await ChatRoom.findByPk(chatId, {
         include: [
-          { model: ChatMember, as: 'members', include: [{ model: User, as: 'user', attributes: ['id', 'username', 'userprofile', 'isOnline'] }] },
+          { model: ChatMember, as: 'members', include: [{ model: User, as: 'user', attributes: memberUserAttrs }] },
           {
             model: ChatMessage,
             as: 'messages',

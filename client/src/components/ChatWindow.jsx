@@ -26,6 +26,8 @@ import { onUserTyping, onUserStopTyping, offUserTyping, offUserStopTyping } from
 
 
 import MessageBubble from './MessageBubble';
+import ChatDetailsPanel from './ChatDetailsPanel';
+import AddMembersModal from './AddMembersModal';
 
 function ChatWindow({ chat }) {
   const navigate = useNavigate();
@@ -34,10 +36,12 @@ function ChatWindow({ chat }) {
   const { user } = useSelector(state => state.auth);
   const [messageText, setMessageText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [typingUser, setTypingUser] = useState(null);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [addMembersOpen, setAddMembersOpen] = useState(false);
+
   const messagesEndRef = useRef(null);
   const typingTimeoutRef = useRef(null);
-
-  const [typingUser, setTypingUser] = useState(null); 
   const typingClearTimeoutRef = useRef(null);
 
   useEffect(() => {
@@ -212,23 +216,28 @@ function ChatWindow({ chat }) {
       {/* Header */}
       <AppBar position="static" color="default" elevation={1}>
         <Toolbar>
-          <Badge
-            overlap="circular"
-            anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-            variant="dot"
-            sx={{
-              '& .MuiBadge-badge': {
-                backgroundColor: getOnlineStatus() ? '#44b700' : '#bdbdbd'
-              }
-            }}
+          <Box
+            onClick={() => setDetailsOpen(true)} 
+            sx={{ display: 'flex', alignItems: 'center', flex: 1, cursor: 'pointer' }}
           >
-            <Avatar src={getChatAvatar()} alt={getChatName()}>
-              {getChatName()?.charAt(0).toUpperCase()}
-            </Avatar>
-          </Badge>
-          <Typography variant="h6" sx={{ ml: 2, flex: 1 }}>
-            {getChatName()}
-          </Typography>
+            <Badge
+              overlap="circular"
+              anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+              variant="dot"
+              sx={{
+                '& .MuiBadge-badge': {
+                  backgroundColor: getOnlineStatus() ? '#44b700' : '#bdbdbd'
+                }
+              }}
+            >
+              <Avatar src={getChatAvatar()} alt={getChatName()}>
+                {getChatName()?.charAt(0).toUpperCase()}
+              </Avatar>
+            </Badge>
+            <Typography variant="h6" sx={{ ml: 2, flex: 1 }}>
+              {getChatName()}
+            </Typography>
+          </Box>
           <Typography variant="caption" color="textSecondary">
             {typingUser ? `${typingUser} is typing...` : (getOnlineStatus() ? 'Online' : 'Offline')}
           </Typography>
@@ -300,6 +309,19 @@ function ChatWindow({ chat }) {
           </Box>
         </form>
       </Paper>
+
+      <ChatDetailsPanel
+        open={detailsOpen}
+        onClose={() => setDetailsOpen(false)}
+        chat={chat}
+        currentUserId={user.id}
+        onOpenAddMembers={() => setAddMembersOpen(true)}   
+      />
+      <AddMembersModal
+        open={addMembersOpen}
+        onClose={() => setAddMembersOpen(false)}
+        chat={chat}
+      />
     </Box>
   );
 }

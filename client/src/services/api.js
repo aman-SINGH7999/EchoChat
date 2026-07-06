@@ -54,4 +54,14 @@ export const chatAPI = {
   markMessagesRead: (chatId) => api.put(`/chats/${chatId}/messages/read`)
 };
 
+// Group endpoints
+export const groupAPI = {
+  updateGroupImage: (chatId, formData) => api.put(`/groups/${chatId}/image`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  }),
+  addMembers: (chatId, memberIds) => api.post(`/groups/${chatId}/members`, { memberIds }),
+  promoteToAdmin: (chatId, memberId) => api.put(`/groups/${chatId}/members/${memberId}/promote`),
+  deactivateMember: (chatId, memberId) => api.put(`/groups/${chatId}/members/${memberId}/deactivate`)
+};
+
 export default api;

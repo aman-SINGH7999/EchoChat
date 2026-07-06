@@ -100,6 +100,14 @@ const chatSlice = createSlice({
       if (index !== -1) {
         state.messages[index].status = 'failed';
       }
+    },
+    replaceChat: (state, action) => {
+      const updated = action.payload;
+      const idx = state.chats.findIndex(c => c.id === updated.id);
+      if (idx !== -1) state.chats[idx] = { ...state.chats[idx], ...updated };
+      if (state.selectedChat?.id === updated.id) {
+        state.selectedChat = { ...state.selectedChat, ...updated };
+      }
     }
 
   }
@@ -123,7 +131,8 @@ export const {
   updateChatPreview,
   replaceMessage, 
   markMessagesAsRead, 
-  markMessageFailed
+  markMessageFailed,
+  replaceChat
 } = chatSlice.actions;
 
 export default chatSlice.reducer;

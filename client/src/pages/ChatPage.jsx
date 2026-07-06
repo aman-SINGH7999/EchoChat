@@ -10,7 +10,7 @@ import { Search as SearchIcon, Add as AddIcon, Person as PersonIcon, Logout as L
 import { setChats, setSelectedChat, addMessage, updateChatPreview, addChat, markMessagesAsRead } from '../redux/slices/chatSlice';
 import { logout } from '../redux/slices/authSlice';
 import { chatAPI, userAPI, authAPI } from '../services/api';
-import { joinChat, leaveChat, onReceiveMessage, offReceiveMessage, onNewChat, offNewChat, disconnectSocket, onMessagesRead, offMessagesRead } from '../services/socket';
+import { joinChat, leaveChat, onReceiveMessage, offReceiveMessage, onNewChat, offNewChat, disconnectSocket, onMessagesRead, offMessagesRead, onGroupUpdated, offGroupUpdated } from '../services/socket';
 
 
 
@@ -109,6 +109,22 @@ function ChatPage() {
       offReceiveMessage(handleReceiveMessage); 
     };
   }, [selectedChat, dispatch, user?.id]);
+
+
+  // group purpose
+  useEffect(() => {
+    const handleGroupUpdated = (updatedChat) => {
+      dispatch(addChat(updatedChat)); // agar chat list me nahi hai to add karega
+      dispatch(updateChatPreview({ chat_id: updatedChat.id, ...updatedChat.messages?.[0] }));
+      // agar yahi chat abhi khula hai, usko refresh karo
+      if (selectedChatRef.current?.id === updatedChat.id) {
+        dispatch(setSelectedChat(updatedChat));
+      }
+    };
+
+    onGroupUpdated(handleGroupUpdated);
+    return () => offGroupUpdated(handleGroupUpdated);
+  }, [dispatch]);
 
 
   const loadChats = async () => {

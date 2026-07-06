@@ -162,3 +162,14 @@ export const offUserStopTyping = (callback) => {
   const socket = getSocket();
   socket.off('user_stop_typing', callback);
 };
+
+// group purpose
+export const onGroupUpdated = (callback) => {
+  const socket = getSocket();
+  socket.on('group_updated', callback);
+};
+
+export const offGroupUpdated = (callback) => {
+  const socket = getSocket();
+  socket.off('group_updated', callback);
+};
