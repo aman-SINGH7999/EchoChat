@@ -21,6 +21,7 @@ import moment from 'moment';
 import { chatAPI } from '../services/api';
 import { setMessages, addMessage, setLoading, updateChatPreview, addChat, setSelectedChat, replaceMessage, markMessageFailed } from '../redux/slices/chatSlice';
 import { notifyTyping, notifyStopTyping, sendMessage as emitSocketMessage, joinChat } from '../services/socket';
+import { onUserTyping, onUserStopTyping, offUserTyping, offUserStopTyping } from '../services/socket';
 
 
 
@@ -36,11 +37,14 @@ function ChatWindow({ chat }) {
   const messagesEndRef = useRef(null);
   const typingTimeoutRef = useRef(null);
 
+  const [typingUser, setTypingUser] = useState(null); 
+  const typingClearTimeoutRef = useRef(null);
+
   useEffect(() => {
     if (chat?.id) {
       loadMessages();
     }else {
-      dispatch(setMessages([])); // temp chat — koi purana message nahi
+      dispatch(setMessages([])); 
     }
   }, [chat?.id]);
 
@@ -48,11 +52,40 @@ function ChatWindow({ chat }) {
     scrollToBottom();
   }, [messages]);
 
+  useEffect(() => {
+    if (!chat?.id) return;
+
+    const handleUserTyping = ({ userId, username, chatId }) => {
+      if (userId === user.id) return;        
+      if (chatId !== chat.id) return;         
+      setTypingUser(username);
+
+      if (typingClearTimeoutRef.current) clearTimeout(typingClearTimeoutRef.current);
+      typingClearTimeoutRef.current = setTimeout(() => setTypingUser(null), 3000);
+    };
+
+    const handleUserStopTyping = ({ userId, chatId }) => {
+      if (userId === user.id) return;
+      if (chatId !== chat.id) return;
+      setTypingUser(null);
+      if (typingClearTimeoutRef.current) clearTimeout(typingClearTimeoutRef.current);
+    };
+
+    onUserTyping(handleUserTyping);
+    onUserStopTyping(handleUserStopTyping);
+
+    return () => {
+      offUserTyping(handleUserTyping);
+      offUserStopTyping(handleUserStopTyping);
+      setTypingUser(null);
+    };
+  }, [chat?.id, user.id]);
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  // message ka status decide karo — sirf apne bheje hue messages ke liye
+  // message status decide
   const computeStatus = (message, currentUserId) => {
     if (message.sender_id !== currentUserId) return undefined;
     const otherStatus = message.statuses?.find(s => s.user_id !== currentUserId);
@@ -69,7 +102,7 @@ function ChatWindow({ chat }) {
       }));
       dispatch(setMessages(withStatus));
 
-      // chat khulte hi doosre ke bheje messages read mark karo
+      // chat open, messages read mark
       chatAPI.markMessagesRead(chat.id).catch(() => {});
     } catch (error) {
       console.error('Error loading messages:', error);
@@ -85,7 +118,7 @@ function ChatWindow({ chat }) {
     const tempId = `temp-${Date.now()}`;
     const textToSend = messageText;
 
-    // TURANT UI me clock icon ke saath message dikhao — abhi server ne accept nahi kiya
+
     dispatch(addMessage({
       id: tempId,
       chat_id: chat.id,
@@ -94,7 +127,7 @@ function ChatWindow({ chat }) {
       message_text: textToSend,
       message_type: 'text',
       createdAt: new Date().toISOString(),
-      status: 'pending',   // CLOCK ICON
+      status: 'pending',   
       reactions: []
     }));
     setMessageText('');
@@ -131,14 +164,14 @@ function ChatWindow({ chat }) {
       setIsTyping(false);
     } catch (error) {
       console.error('Error sending message:', error);
-      dispatch(markMessageFailed(tempId)); // chaho to failed icon bhi dikha sakte ho
+      dispatch(markMessageFailed(tempId)); 
     }
   };
 
   const handleInputChange = (e) => {
     setMessageText(e.target.value);
 
-    if (!chat?.id) return; // temp chat me typing-notify ki zarurat nahi
+    if (!chat?.id) return; 
 
     if (!isTyping) {
       notifyTyping(chat.id, user.id, user.username);
@@ -197,7 +230,7 @@ function ChatWindow({ chat }) {
             {getChatName()}
           </Typography>
           <Typography variant="caption" color="textSecondary">
-            {getOnlineStatus() ? 'Online' : 'Offline'}
+            {typingUser ? `${typingUser} is typing...` : (getOnlineStatus() ? 'Online' : 'Offline')}
           </Typography>
         </Toolbar>
       </AppBar>

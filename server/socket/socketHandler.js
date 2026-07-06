@@ -55,7 +55,7 @@ const initializeSocket = (io) => {
 
     // Read message
     socket.on('message_read', (data) => {
-      console.log('Room members:', io.sockets.adapter.rooms.get(`chat_${chatId}`));
+      console.log('Room members:', io.sockets.adapter.rooms.get(`chat_${data.chatId}`));
       io.to(`chat_${data.chatId}`).emit('message_read_receipt', {
         messageId: data.messageId,
         userId: data.userId
@@ -69,7 +69,9 @@ const initializeSocket = (io) => {
       // Find user ID by socket ID
       const userId = Object.keys(onlineUsers).find(key => onlineUsers[key] === socket.id);
       if (userId) {
-        delete onlineUsers[userId];
+        if (onlineUsers[userId] === socket.id) {
+          delete onlineUsers[userId];
+        }
         
         const user = await User.findByPk(userId);
         if (user) {

@@ -7,7 +7,7 @@ const generateOTP = () => {
   return Math.floor(100000 + Math.random() * 900000).toString();
 };
 
-exports.register = async (req, res) => {
+const register = async (req, res) => {
   try {
     const { email, password, confirmPassword, username } = req.body;
 
@@ -57,7 +57,7 @@ exports.register = async (req, res) => {
   }
 };
 
-exports.login = async (req, res) => {
+const login = async (req, res) => {
   try {
     const { email, password } = req.body;
 
@@ -96,7 +96,7 @@ exports.login = async (req, res) => {
   }
 };
 
-exports.forgotPassword = async (req, res) => {
+const forgotPassword = async (req, res) => {
   try {
     const { email } = req.body;
 
@@ -132,7 +132,7 @@ exports.forgotPassword = async (req, res) => {
   }
 };
 
-exports.verifyOTP = async (req, res) => {
+const verifyOTP = async (req, res) => {
   try {
     const { email, otp } = req.body;
 
@@ -162,7 +162,7 @@ exports.verifyOTP = async (req, res) => {
   }
 };
 
-exports.resetPassword = async (req, res) => {
+const resetPassword = async (req, res) => {
   try {
     const { email, password, confirmPassword } = req.body;
 
@@ -198,7 +198,7 @@ exports.resetPassword = async (req, res) => {
   }
 };
 
-exports.logout = async (req, res) => {
+const logout = async (req, res) => {
   try {
     const userId = req.user.id;
     const user = await User.findByPk(userId);
@@ -211,3 +211,13 @@ exports.logout = async (req, res) => {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
+
+
+module.exports = {
+  register,
+  login,
+  forgotPassword,
+  verifyOTP,
+  resetPassword,
+  logout
+}

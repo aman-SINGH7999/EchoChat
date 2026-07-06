@@ -2,7 +2,7 @@ const { ChatRoom, ChatMessage, ChatMember, ChatNotification, User, Reaction, Mes
 const { Op } = require('sequelize');
 const { getOnlineUsers, joinUserToRoom } = require('../socket/socketHandler');
 
-exports.sendMessageUnified = async (req, res) => {
+const sendMessageUnified = async (req, res) => {
   const userId = req.user.id;
   const { chatId, otherUserId, message_text, message_type = 'text', file_id = null, reply_to = null } = req.body;
 
@@ -151,7 +151,7 @@ exports.sendMessageUnified = async (req, res) => {
   }
 };
 
-exports.createPrivateChat = async (req, res) => {
+const createPrivateChat = async (req, res) => {
   try {
     const userId = req.user.id;
     const { otherUserId } = req.body;
@@ -187,7 +187,7 @@ exports.createPrivateChat = async (req, res) => {
   }
 };
 
-exports.createGroupChat = async (req, res) => {
+const createGroupChat = async (req, res) => {
   try {
     const userId = req.user.id;
     const { chat_name, chat_description, members } = req.body;
@@ -223,7 +223,7 @@ exports.createGroupChat = async (req, res) => {
   }
 };
 
-exports.getChats = async (req, res) => {
+const getChats = async (req, res) => {
   try {
     const userId = req.user.id;
 
@@ -258,7 +258,7 @@ exports.getChats = async (req, res) => {
   }
 };
 
-exports.getChat = async (req, res) => {
+const getChat = async (req, res) => {
   try {
     const { chatId } = req.params;
     const userId = req.user.id;
@@ -295,7 +295,7 @@ exports.getChat = async (req, res) => {
   }
 };
 
-exports.getMessages = async (req, res) => {
+const getMessages = async (req, res) => {
   try {
     const { chatId } = req.params;
     const { page = 1, limit = 50 } = req.query;
@@ -321,7 +321,7 @@ exports.getMessages = async (req, res) => {
   }
 };
 
-exports.sendMessage = async (req, res) => {
+const sendMessage = async (req, res) => {
   try {
     const { chatId } = req.params;
     const userId = req.user.id;
@@ -411,7 +411,7 @@ exports.sendMessage = async (req, res) => {
   }
 };
 
-exports.deleteMessage = async (req, res) => {
+const deleteMessage = async (req, res) => {
   try {
     const { messageId } = req.params;
     const userId = req.user.id;
@@ -434,7 +434,7 @@ exports.deleteMessage = async (req, res) => {
   }
 };
 
-exports.addReaction = async (req, res) => {
+const addReaction = async (req, res) => {
   try {
     const { messageId } = req.params;
     const userId = req.user.id;
@@ -461,12 +461,11 @@ exports.addReaction = async (req, res) => {
 };
 
 
-exports.markMessagesRead = async (req, res) => {
+const markMessagesRead = async (req, res) => {
   try {
     const { chatId } = req.params;
     const userId = req.user.id;
 
-    // wo saare messages jo maine nahi bheje (doosre ne bheje hain)
     const unreadMessages = await ChatMessage.findAll({
       where: { chat_id: chatId, sender_id: { [Op.ne]: userId }, deleted_at: null }
     });
@@ -485,8 +484,7 @@ exports.markMessagesRead = async (req, res) => {
         await status.update({ status: 'read', read_at: new Date() });
       }
     }
-
-    // sender ko real-time batao ki unke message read ho gaye — double tick ke liye
+    
     const io = req.app.get('io');
     io.to(`chat_${chatId}`).emit('messages_read', {
       chatId: parseInt(chatId),
@@ -500,3 +498,18 @@ exports.markMessagesRead = async (req, res) => {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
+
+
+
+module.exports = {
+  sendMessageUnified,
+  createPrivateChat,
+  createGroupChat,
+  getChats,
+  getChat,
+  getMessages,
+  sendMessage,
+  deleteMessage,
+  addReaction,
+  markMessagesRead
+}

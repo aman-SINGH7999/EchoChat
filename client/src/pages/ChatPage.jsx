@@ -39,43 +39,35 @@ function ChatPage() {
     loadChats();
   }, []);
 
-  // NAYA — jab chats load ho jaayen (ya URL badle), URL wale chatId ko select karo
+  
   useEffect(() => {
-    if (!chatId) return;                              // URL me chatId nahi hai to kuch mat karo
-    if (selectedChat?.id === parseInt(chatId)) return; // already sahi chat selected hai
+    if (!chatId) return;                              
+    if (selectedChat?.id === parseInt(chatId)) return; 
 
     const chatFromList = chats.find(c => c.id === parseInt(chatId));
     if (chatFromList) {
       dispatch(setSelectedChat(chatFromList));
     } else if (chats.length > 0) {
-      // chats load ho gaye hain par ye chatId list me nahi mila — server se fetch karo
       chatAPI.getChat(chatId)
         .then(res => dispatch(setSelectedChat(res.data.chat)))
         .catch(err => {
           console.error('Chat not found:', err);
-          navigate('/chats'); // invalid/inaccessible chatId — clean URL pe bhej do
+          navigate('/chats'); // invalid/inaccessible chatId 
         });
     }
   }, [chatId, chats]);
 
-  // useEffect(() => {
-  //   if (selectedChat && !selectedChat.isTemp) {
-  //     joinChat(selectedChat.id);
-  //     return () => leaveChat(selectedChat.id);
-  //   }
-  // }, [selectedChat]);
 
   useEffect(() => {
     if (selectedChat && !selectedChat.isTemp) {
       joinChat(selectedChat.id);
-      return () => leaveChat(selectedChat.id);
     }
   }, [selectedChat?.id, selectedChat?.isTemp]);
 
   useEffect(() => {
     const handleMessagesRead = ({ readerId, messageIds, chatId }) => {
       if (readerId === user.id) return;
-      // FIX — ref.current se hamesha LATEST selectedChat milega, stale closure nahi
+    
       if (selectedChatRef.current?.id !== chatId) return;
       dispatch(markMessagesAsRead({ messageIds }));
     };
@@ -106,7 +98,7 @@ function ChatPage() {
 
       if (selectedChat && data.chat_id === selectedChat.id) {
         dispatch(addMessage(data));
-        chatAPI.markMessagesRead(selectedChat.id).catch(() => {}); // NAYA — chat open hai to turant read
+        chatAPI.markMessagesRead(selectedChat.id).catch(() => {}); 
       }
       dispatch(updateChatPreview(data));
     };
@@ -156,13 +148,12 @@ function ChatPage() {
     } catch (error) {
       console.error('Logout API error:', error);
     }
-    disconnectSocket();             // socket bhi cleanly disconnect karo
+    disconnectSocket();             
     dispatch(logout());
     navigate('/login');
   };
 
 
-  // UPDATE — search se existing chat select ho to URL me daalo; naya (temp) chat ho to /chats pe hi raho
   const handleSelectSearchedUser = (selectedUser) => {
     const existingChat = chats.find(chat =>
       chat.chat_type === 'private' &&
@@ -186,7 +177,7 @@ function ChatPage() {
         messages: []
       };
       dispatch(setSelectedChat(tempChat));
-      navigate('/chats');   // temp chat ke liye koi id nahi, plain /chats
+      navigate('/chats');   
     }
 
     setOpenSearchModal(false);

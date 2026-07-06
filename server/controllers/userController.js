@@ -1,6 +1,6 @@
 const { User } = require('../models');
 
-exports.getProfile = async (req, res) => {
+const getProfile = async (req, res) => {
   try {
     const userId = req.user.id;
     
@@ -19,7 +19,7 @@ exports.getProfile = async (req, res) => {
   }
 };
 
-exports.updateProfile = async (req, res) => {
+const updateProfile = async (req, res) => {
   try {
     const userId = req.user.id;
     const { username, userphone, gender, country, state, city, pincode, userprofile } = req.body;
@@ -51,7 +51,7 @@ exports.updateProfile = async (req, res) => {
   }
 };
 
-exports.uploadProfilePicture = async (req, res) => {
+const uploadProfilePicture = async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ message: 'No file uploaded' });
@@ -77,7 +77,7 @@ exports.uploadProfilePicture = async (req, res) => {
   }
 };
 
-exports.searchUsers = async (req, res) => {
+const searchUsers = async (req, res) => {
   try {
     const { query } = req.query;
     const userId = req.user.id;
@@ -107,7 +107,7 @@ exports.searchUsers = async (req, res) => {
   }
 };
 
-exports.getUserById = async (req, res) => {
+const getUserById = async (req, res) => {
   try {
     const { userId } = req.params;
 
@@ -124,4 +124,13 @@ exports.getUserById = async (req, res) => {
     console.error(error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
+};
+
+
+module.exports = {
+  getProfile,
+  updateProfile,
+  uploadProfilePicture,
+  searchUsers,
+  getUserById
 };

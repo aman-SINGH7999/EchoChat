@@ -4,16 +4,19 @@ const SOCKET_URL = import.meta.env.VITE_REACT_APP_SOCKET_URL || 'http://localhos
 
 let socket = null;
 let joinedRooms = new Set();
+let currentUserId = null; 
+
+// services/socket.js
 
 export const connectSocket = () => {
-  if (socket && socket.connected) {
-    return socket; // already connected — rooms disturb mat karo
-  }
-
   if (socket) {
-    socket.disconnect();
+    if (!socket.connected) {
+      socket.connect(); 
+    }
+    return socket;
   }
 
+  // only first time new socket create
   socket = io(SOCKET_URL, {
     reconnection: true,
     reconnectionDelay: 1000,
@@ -22,10 +25,18 @@ export const connectSocket = () => {
     transports: ['websocket']
   });
 
-  socket.on('connect', () => console.log('Socket connected'));
+  socket.on('connect', () => {
+    console.log('Socket connected:', socket.id);
+    joinedRooms.forEach(chatId => {
+      socket.emit('join_chat', chatId);
+    });
+    if (currentUserId) {
+      socket.emit('user_connect', currentUserId);
+    }
+  });
 
-  socket.on('reconnect', () => {
-    joinedRooms.forEach(chatId => socket.emit('join_chat', chatId));
+  socket.io.on('reconnect', () => {
+    console.log('Manager reconnected');
   });
 
   socket.on('disconnect', () => console.log('Socket disconnected'));
@@ -45,10 +56,12 @@ export const disconnectSocket = () => {
     socket.disconnect();
     socket = null;
     joinedRooms.clear();
+    currentUserId = null;
   }
 };
 
 export const emitUserConnect = (userId) => {
+  currentUserId = userId;
   const socket = getSocket();
   socket.emit('user_connect', userId);
 };
@@ -138,4 +151,14 @@ export const onMessagesRead = (callback) => {
 export const offMessagesRead = (callback) => {
   const socket = getSocket();
   socket.off('messages_read', callback);
+};
+
+export const offUserTyping = (callback) => {
+  const socket = getSocket();
+  socket.off('user_typing', callback);
+};
+
+export const offUserStopTyping = (callback) => {
+  const socket = getSocket();
+  socket.off('user_stop_typing', callback);
 };
