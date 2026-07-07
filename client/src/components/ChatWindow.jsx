@@ -239,7 +239,11 @@ function ChatWindow({ chat }) {
             </Typography>
           </Box>
           <Typography variant="caption" color="textSecondary">
-            {typingUser ? `${typingUser} is typing...` : (getOnlineStatus() ? 'Online' : 'Offline')}
+            {typingUser
+              ? `${typingUser} is typing...`
+              : chat.chat_type === 'group'
+                ? ''                          
+                : (getOnlineStatus() ? 'Online' : 'Offline')}
           </Typography>
         </Toolbar>
       </AppBar>

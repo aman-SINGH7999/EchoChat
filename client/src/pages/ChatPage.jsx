@@ -114,9 +114,9 @@ function ChatPage() {
   // group purpose
   useEffect(() => {
     const handleGroupUpdated = (updatedChat) => {
-      dispatch(addChat(updatedChat)); // agar chat list me nahi hai to add karega
+      dispatch(addChat(updatedChat)); 
       dispatch(updateChatPreview({ chat_id: updatedChat.id, ...updatedChat.messages?.[0] }));
-      // agar yahi chat abhi khula hai, usko refresh karo
+
       if (selectedChatRef.current?.id === updatedChat.id) {
         dispatch(setSelectedChat(updatedChat));
       }

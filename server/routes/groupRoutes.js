@@ -8,5 +8,6 @@ router.put('/:chatId/image', authenticate, upload.single('file'), groupControlle
 router.post('/:chatId/members', authenticate, groupController.addMembers);
 router.put('/:chatId/members/:memberId/promote', authenticate, groupController.promoteToAdmin);
 router.put('/:chatId/members/:memberId/deactivate', authenticate, groupController.deactivateMember);
+router.put('/:chatId/members/:memberId/reactivate', authenticate, groupController.reactivateMember);
 
 module.exports = router;

@@ -69,6 +69,16 @@ function ChatDetailsPanel({ open, onClose, chat, currentUserId, onOpenAddMembers
     handleMenuClose();
   };
 
+  const handleReactivate = async (memberId) => {
+    try {
+      const res = await groupAPI.reactivateMember(chat.id, memberId);
+      dispatch(replaceChat(res.data.chat));
+      handleMenuClose();
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to reactivate member');
+    }
+  };
+
   const targetMember = chat.members?.find(m => m.user_id === menuMemberId);
 
   return (
@@ -157,22 +167,49 @@ function ChatDetailsPanel({ open, onClose, chat, currentUserId, onOpenAddMembers
                 {m.role === 'admin' && (
                   <Chip size="small" icon={<AdminIcon fontSize="small" />} label="Admin" variant="outlined" sx={{ mr: 1 }} />
                 )}
-                {/* NAYA — sirf admin ko, doosre active non-self members pe menu dikhega */}
-                {isAdmin && m.user_id !== currentUserId && m.is_active !== false && (
-                  <IconButton size="small" onClick={(e) => handleMenuOpen(e, m.user_id)}>
-                    <MoreVertIcon fontSize="small" />
-                  </IconButton>
+
+               
+                {isAdmin &&
+                  m.user_id !== currentUserId &&
+                  m.role !== 'admin' && (
+                    <IconButton
+                      size="small"
+                      onClick={(e) => handleMenuOpen(e, m.user_id)}
+                    >
+                      <MoreVertIcon fontSize="small" />
+                    </IconButton>
                 )}
               </ListItem>
             ))}
           </List>
 
-          <Menu anchorEl={menuAnchor} open={Boolean(menuAnchor)} onClose={handleMenuClose}>
-            {targetMember?.role !== 'admin' && (
-              <MenuItem onClick={handlePromote}>Make Admin</MenuItem>
-            )}
-            {targetMember?.role !== 'admin' && (
-              <MenuItem onClick={handleDeactivate} sx={{ color: 'error.main' }}>Deactivate</MenuItem>
+          <Menu
+            anchorEl={menuAnchor}
+            open={Boolean(menuAnchor)}
+            onClose={handleMenuClose}
+          >
+             {!targetMember ? null : targetMember.is_active === false ? (
+              <MenuItem
+                onClick={() => {
+                  handleReactivate(targetMember.user_id);
+                  handleMenuClose();
+                }}
+              >
+                Reactivate
+              </MenuItem>
+            ) : (
+              <>
+                <MenuItem onClick={handlePromote}>
+                  Make Admin
+                </MenuItem>
+
+                <MenuItem
+                  onClick={handleDeactivate}
+                  sx={{ color: 'error.main' }}
+                >
+                  Deactivate
+                </MenuItem>
+              </>
             )}
           </Menu>
         </Box>
@@ -196,4 +233,4 @@ function ChatDetailsPanel({ open, onClose, chat, currentUserId, onOpenAddMembers
   );
 }
 
-export default ChatDetailsPanel;
+export default ChatDetailsPanel; 

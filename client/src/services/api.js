@@ -61,7 +61,8 @@ export const groupAPI = {
   }),
   addMembers: (chatId, memberIds) => api.post(`/groups/${chatId}/members`, { memberIds }),
   promoteToAdmin: (chatId, memberId) => api.put(`/groups/${chatId}/members/${memberId}/promote`),
-  deactivateMember: (chatId, memberId) => api.put(`/groups/${chatId}/members/${memberId}/deactivate`)
+  deactivateMember: (chatId, memberId) => api.put(`/groups/${chatId}/members/${memberId}/deactivate`),
+  reactivateMember: (chatId, memberId) => api.put(`/groups/${chatId}/members/${memberId}/reactivate`)
 };
 
 export default api;

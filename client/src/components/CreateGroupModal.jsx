@@ -1,25 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import {
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  TextField,
-  Button,
-  Box,
-  Chip,
-  Typography,
-  List,
-  ListItem,
-  ListItemButton,
-  ListItemText,
-  Checkbox,
-  CircularProgress
-} from '@mui/material';
+import { TextField, Box, Chip, Typography, List, ListItem, ListItemButton, ListItemText, Checkbox, CircularProgress } from '@mui/material';
 
 import { addChat } from '../redux/slices/chatSlice';
 import { chatAPI, userAPI } from '../services/api';
+import CommonModal from './CommonModal';   
 
 function CreateGroupModal({ open, onClose }) {
   const dispatch = useDispatch();
@@ -31,25 +16,25 @@ function CreateGroupModal({ open, onClose }) {
   const [searchResults, setSearchResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searching, setSearching] = useState(false);
+  const [hasSearched, setHasSearched] = useState(false);   
 
   const handleSearch = async (query) => {
     if (query.trim().length < 2) {
       setSearchResults([]);
+      setHasSearched(false);
       return;
     }
 
     setSearching(true);
-
     try {
       const response = await userAPI.searchUsers(query);
-
-      setSearchResults(
-        response.data.users.filter(u => u.id !== user.id)
-      );
+      setSearchResults(response.data.users.filter(u => u.id !== user.id));
     } catch (error) {
       console.error('Error searching users:', error);
+      setSearchResults([]);
     } finally {
       setSearching(false);
+      setHasSearched(true);   // NAYA
     }
   };
 
@@ -57,7 +42,6 @@ function CreateGroupModal({ open, onClose }) {
     const timer = setTimeout(() => {
       setDebouncedQuery(searchQuery);
     }, 500);
-
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
@@ -73,12 +57,19 @@ function CreateGroupModal({ open, onClose }) {
     );
   };
 
+  const resetState = () => {
+    setGroupName('');
+    setSelectedMembers([]);
+    setSearchQuery('');
+    setSearchResults([]);
+    setHasSearched(false);
+  };
+
   const handleCreateGroup = async () => {
     if (!groupName.trim()) {
       alert('Group name is required');
       return;
     }
-
     if (selectedMembers.length === 0) {
       alert('Select at least one member');
       return;
@@ -90,13 +81,9 @@ function CreateGroupModal({ open, onClose }) {
         chat_name: groupName,
         members: selectedMembers.map(m => m.id)
       });
-
       dispatch(addChat(response.data.chat));
+      resetState();
       onClose();
-      setGroupName('');
-      setSelectedMembers([]);
-      setSearchQuery('');
-      setSearchResults([]);
     } catch (error) {
       console.error('Error creating group:', error);
       alert('Failed to create group');
@@ -106,82 +93,77 @@ function CreateGroupModal({ open, onClose }) {
   };
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogTitle>Create Group Chat</DialogTitle>
-      <DialogContent>
-        <Box sx={{ pt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
-          <TextField
-            fullWidth
-            label="Group Name"
-            value={groupName}
-            onChange={(e) => setGroupName(e.target.value)}
-            placeholder="Enter group name"
-          />
+    <CommonModal
+      open={open}
+      onClose={() => { resetState(); onClose(); }}
+      title="Create Group Chat"
+      onAction={handleCreateGroup}
+      actionLabel="Create"
+      actionLoading={loading}
+      actionDisabled={!groupName.trim() || selectedMembers.length === 0}
+    >
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <TextField
+          fullWidth
+          label="Group Name"
+          value={groupName}
+          onChange={(e) => setGroupName(e.target.value)}
+          placeholder="Enter group name"
+        />
 
-          <TextField
-            fullWidth
-            label="Add Members"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search users..."
-          />
+        <TextField
+          fullWidth
+          label="Add Members"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder="Search users..."
+        />
 
-          {/* Selected Members */}
-          {selectedMembers.length > 0 && (
-            <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-              {selectedMembers.map((member) => (
-                <Chip
+        {selectedMembers.length > 0 && (
+          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+            {selectedMembers.map((member) => (
+              <Chip
+                key={member.id}
+                label={member.username}
+                onDelete={() => handleToggleMember(member)}
+              />
+            ))}
+          </Box>
+        )}
+
+        {searching ? (
+          <Box display="flex" justifyContent="center" py={2}>
+            <CircularProgress size={24} />
+          </Box>
+        ) : searchResults.length > 0 ? (
+          <Box>
+            <Typography variant="subtitle2">Results</Typography>
+            <List sx={{ bgcolor: '#f5f5f5', borderRadius: 1 }}>
+              {searchResults.map((member) => (
+                <ListItem
                   key={member.id}
-                  label={member.username}
-                  onDelete={() => handleToggleMember(member)}
-                />
+                  disablePadding
+                  secondaryAction={
+                    <Checkbox
+                      checked={selectedMembers.some(m => m.id === member.id)}
+                      onChange={() => handleToggleMember(member)}
+                    />
+                  }
+                >
+                  <ListItemButton onClick={() => handleToggleMember(member)}>
+                    <ListItemText primary={member.username} secondary={member.email} />
+                  </ListItemButton>
+                </ListItem>
               ))}
-            </Box>
-          )}
-
-          {/* Search Results */}
-          {searchResults.length > 0 && (
-            <Box>
-              <Typography variant="subtitle2">Results</Typography>
-              <List sx={{ bgcolor: '#f5f5f5', borderRadius: 1 }}>
-                {searchResults.map((member) => (
-                  <ListItem
-                    key={member.id}
-                    disablePadding
-                    secondaryAction={
-                      <Checkbox
-                        checked={selectedMembers.some(m => m.id === member.id)}
-                        onChange={() => handleToggleMember(member)}
-                      />
-                    }
-                  >
-                    <ListItemButton onClick={() => handleToggleMember(member)}>
-                      <ListItemText
-                        primary={member.username}
-                        secondary={member.email}
-                      />
-                    </ListItemButton>
-                  </ListItem>
-                ))}
-              </List>
-            </Box>
-          )}
-
-          {searching && <CircularProgress size={24} />}
-        </Box>
-      </DialogContent>
-      <DialogActions>
-        <Button onClick={onClose}>Cancel</Button>
-        <Button
-          onClick={handleCreateGroup}
-          variant="contained"
-          color="primary"
-          disabled={loading || !groupName.trim() || selectedMembers.length === 0}
-        >
-          {loading ? <CircularProgress size={24} /> : 'Create'}
-        </Button>
-      </DialogActions>
-    </Dialog>
+            </List>
+          </Box>
+        ) : hasSearched ? (
+          <Box display="flex" justifyContent="center" py={2}>
+            <Typography color="textSecondary">No users found</Typography>
+          </Box>
+        ) : null}
+      </Box>
+    </CommonModal>
   );
 }
 

@@ -7,6 +7,19 @@ function ChatSidebar({ chats, selectedChat, onSelectChat, currentUserId }) {
     return moment(date).fromNow();
   };
 
+  const getPreviewText = (chat, lastMessage) => {
+    if (!lastMessage || !lastMessage.message_text) {
+      return 'No messages yet';
+    }
+
+    if (chat.chat_type === 'group') {
+      const senderName = lastMessage.sender?.username || 'Unknown';
+      return `${senderName}: ${lastMessage.message_text}`;
+    }
+
+    return lastMessage.message_text;
+  };
+
   return (
     <List sx={{ p: 0 }}>
       {chats && chats.length > 0 ? (
@@ -53,7 +66,7 @@ function ChatSidebar({ chats, selectedChat, onSelectChat, currentUserId }) {
                   secondary={
                     <Box>
                       <Typography variant="body2" noWrap color="textSecondary">
-                        {lastMessage ? (lastMessage.sender?.username + ': ' + lastMessage.message_text) : 'No messages yet'}
+                        {getPreviewText(chat, lastMessage)}
                       </Typography>
                       <Typography variant="caption" color="textSecondary">
                         {lastMessage ? formatTime(lastMessage.createdAt) : ''}

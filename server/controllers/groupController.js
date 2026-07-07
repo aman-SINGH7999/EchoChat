@@ -187,9 +187,49 @@ const deactivateMember = async (req, res) => {
   }
 };
 
+
+// 5. Inactive member ko wapas active karo — sirf admin
+const reactivateMember = async (req, res) => {
+  try {
+    const { chatId, memberId } = req.params;
+    const userId = req.user.id;
+
+    const { error, status } = await requireAdmin(chatId, userId);
+    if (error) return res.status(status).json({ message: error });
+
+    const target = await ChatMember.findOne({
+      where: { chat_id: chatId, user_id: memberId, is_active: false }
+    });
+
+    if (!target) {
+      return res.status(404).json({ message: 'Inactive member not found in this group' });
+    }
+
+    await target.update({ is_active: true });
+
+    const fullChat = await getFullGroup(chatId);
+    const io = req.app.get('io');
+    io.to(`chat_${chatId}`).emit('group_updated', fullChat);
+
+    // member ko room me wapas force-join karo agar wo online hai
+    const onlineUsers = getOnlineUsers();
+    joinUserToRoom(io, memberId, chatId);
+    const socketId = onlineUsers[memberId];
+    if (socketId) {
+      io.to(socketId).emit('new_chat', fullChat); // sidebar me wapas dikhao
+    }
+
+    res.json({ message: 'Member reactivated', chat: fullChat });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
 module.exports = {
   updateGroupImage,
   addMembers,
   promoteToAdmin,
-  deactivateMember
+  deactivateMember,
+  reactivateMember
 };
