@@ -11,12 +11,21 @@ import {
   Avatar,
   CircularProgress,
   Alert,
-  Grid
+  Grid,
+  MenuItem,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  IconButton
 } from '@mui/material';
 import { ArrowBack as ArrowBackIcon } from '@mui/icons-material';
+import { RiImageAddFill } from "react-icons/ri";
+import CameraAltIcon from '@mui/icons-material/CameraAlt';
 import { logout, setUser } from '../redux/slices/authSlice';
 import { userAPI, authAPI } from '../services/api';
 import { disconnectSocket } from '../services/socket';
+import CommonModal from '../components/CommonModal';
 
 function ProfilePage() {
   const dispatch = useDispatch();
@@ -35,6 +44,9 @@ function ProfilePage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [imageModalOpen, setImageModalOpen] = useState(false);
+  const [previewImage, setPreviewImage] = useState('');
+  const [imageUploading, setImageUploading] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -50,12 +62,54 @@ function ProfilePage() {
     }
   }, [user]);
 
+  useEffect(() => {
+    return () => {
+      if (previewImage) {
+        URL.revokeObjectURL(previewImage);
+      }
+    };
+  }, [previewImage]);
+
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
   const handleImageChange = (e) => {
-    setProfileImage(e.target.files[0]);
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (previewImage) {
+      URL.revokeObjectURL(previewImage);
+    }
+
+    setProfileImage(file);
+    setPreviewImage(URL.createObjectURL(file));
+  };
+
+  const handleUploadProfileImage = async () => {
+    try {
+      setImageUploading(true);
+
+      const formDataImage = new FormData();
+      formDataImage.append('file', profileImage);
+
+      const response = await userAPI.uploadProfilePicture(formDataImage);
+
+      dispatch(setUser(response.data.user));
+
+      setImageModalOpen(false);
+      setProfileImage(null);
+      setPreviewImage('');
+
+      setSuccess('Profile image updated successfully');
+    } catch (error) {
+      setError(
+        error.response?.data?.message ||
+        'Failed to upload image'
+      );
+    } finally {
+      setImageUploading(false);
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -68,14 +122,6 @@ function ProfilePage() {
       // Update profile
       const response = await userAPI.updateProfile(formData);
       dispatch(setUser(response.data.user));
-
-      // Upload image if selected
-      if (profileImage) {
-        const formDataImage = new FormData();
-        formDataImage.append('file', profileImage);
-        const imageResponse = await userAPI.uploadProfilePicture(formDataImage);
-        dispatch(setUser(imageResponse.data.user));
-      }
 
       setSuccess('Profile updated successfully');
     } catch (error) {
@@ -104,13 +150,54 @@ function ProfilePage() {
         </Link>
       </Box>
       <Card sx={{ p: 4 }}>
-        <Box textAlign="center" sx={{ mb: 4 }}>
-          <Avatar
-            src={user?.userprofile}
-            sx={{ width: 120, height: 120, margin: '0 auto', mb: 2 }}
-          />
-          <Typography variant="h5">{user?.username}</Typography>
-          <Typography variant="body2" color="textSecondary">{user?.email}</Typography>
+        <Box
+          sx={{
+            mb: 4,
+            display: 'flex',
+            flexDirection: { xs: 'column', md: 'row' },
+            alignItems: 'center',
+            justifyContent: { xs: 'center', md: 'start' },
+            gap: 3,
+            textAlign: { xs: 'center', md: 'left' }
+          }}
+        >
+          <Box sx={{ position: 'relative' }}>
+            <Avatar
+              src={user?.userprofile}
+              sx={{
+                width: 120,
+                height: 120
+              }}
+            >
+              {user?.username?.charAt(0)?.toUpperCase()}
+            </Avatar>
+
+            <IconButton
+              onClick={() => setImageModalOpen(true)}
+              sx={{
+                position: 'absolute',
+                bottom: 0,
+                right: 0,
+                bgcolor: 'rgba(255,255,255,0.4)',
+                boxShadow: 2,
+                '&:hover': {
+                  bgcolor: 'rgba(255,255,255,.6)',
+                }
+              }}
+            >
+              <CameraAltIcon />
+            </IconButton>
+          </Box>
+
+          <Box>
+            <Typography variant="h5">
+              {user?.username}
+            </Typography>
+
+            <Typography variant="body2" color="text.secondary">
+              {user?.email}
+            </Typography>
+          </Box>
         </Box>
 
         {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
@@ -139,17 +226,16 @@ function ProfilePage() {
             <Grid item xs={12} sm={6}>
               <TextField
                 fullWidth
+                select
                 label="Gender"
                 name="gender"
-                select
-                SelectProps={{ native: true }}
                 value={formData.gender}
                 onChange={handleChange}
               >
-                <option value="">Select Gender</option>
-                <option value="male">Male</option>
-                <option value="female">Female</option>
-                <option value="other">Other</option>
+                <MenuItem value=""> Select Gender </MenuItem>
+                <MenuItem value="male"> Male </MenuItem>
+                <MenuItem value="female"> Female </MenuItem>
+                <MenuItem value="other"> Other </MenuItem>
               </TextField>
             </Grid>
             <Grid item xs={12} sm={6}>
@@ -188,15 +274,6 @@ function ProfilePage() {
                 onChange={handleChange}
               />
             </Grid>
-            <Grid item xs={12}>
-              <TextField
-                fullWidth
-                label="Profile Picture"
-                type="file"
-                inputProps={{ accept: 'image/*' }}
-                onChange={handleImageChange}
-              />
-            </Grid>
           </Grid>
 
           <Box sx={{ mt: 3, display: 'flex', gap: 2 }}>
@@ -218,6 +295,55 @@ function ProfilePage() {
           </Box>
         </form>
       </Card>
+
+      {/* image upload and preview */}
+      <CommonModal
+        open={imageModalOpen}
+        onClose={() => {
+          setImageModalOpen(false);
+          setProfileImage(null);
+          setPreviewImage('');
+          setError('');
+        }}
+        title="Change Profile Picture"
+        onAction={handleUploadProfileImage}
+        actionLabel="Save"
+        actionDisabled={!profileImage}
+        actionLoading={imageUploading}
+      >
+        <Box
+          sx={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: 2
+          }}
+        >
+          <Avatar
+            src={previewImage || user?.userprofile}
+            sx={{
+              width: 150,
+              height: 150
+            }}
+          >
+            {user?.username?.charAt(0)?.toUpperCase()}
+          </Avatar>
+
+          <Button
+            variant="outlined"
+            component="label"
+          >
+            {profileImage ? profileImage.name : 'Choose Image'}
+
+            <input
+              hidden
+              type="file"
+              accept="image/*"
+              onChange={handleImageChange}
+            />
+          </Button>
+        </Box>
+      </CommonModal>
     </Container>
   );
 }
