@@ -6,7 +6,9 @@ const initialState = {
   messages: [],
   loading: false,
   error: null,
-  onlineUsers: []
+  onlineUsers: [],
+  hasMoreMessages: true,     
+  loadingMoreMessages: false 
 };
 
 const chatSlice = createSlice({
@@ -122,6 +124,16 @@ const chatSlice = createSlice({
         };
       }
     },
+    prependOlderMessages: (state, action) => {
+      state.messages = [...action.payload, ...state.messages];
+    },
+    setHasMoreMessages: (state, action) => {
+      state.hasMoreMessages = action.payload;
+    },
+    setLoadingMoreMessages: (state, action) => {
+      state.loadingMoreMessages = action.payload;
+    },
+
 
   }
 });
@@ -146,7 +158,11 @@ export const {
   markMessagesAsRead, 
   markMessageFailed,
   replaceChat,
-  updateChatPreviewOnEdit
+  updateChatPreviewOnEdit,
+  prependOlderMessages,
+  setHasMoreMessages,
+  setLoadingMoreMessages
+
 } = chatSlice.actions;
 
 export default chatSlice.reducer;

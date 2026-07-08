@@ -46,8 +46,7 @@ export const chatAPI = {
   sendMessageUnified: (data) => api.post('/chats/messages', data),
   getChats: () => api.get('/chats'),
   getChat: (chatId) => api.get(`/chats/${chatId}`),
-  getMessages: (chatId, page = 1, limit = 50) =>
-    api.get(`/chats/${chatId}/messages`, { params: { page, limit } }),
+  getMessages: (chatId, params = {}) => api.get(`/chats/${chatId}/messages`, { params }),
   sendMessage: (chatId, data) => api.post(`/chats/${chatId}/messages`, data),
   markMessagesRead: (chatId) => api.put(`/chats/${chatId}/messages/read`)
 };

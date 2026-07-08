@@ -307,11 +307,16 @@ const getChat = async (req, res) => {
 const getMessages = async (req, res) => {
   try {
     const { chatId } = req.params;
-    const { page = 1, limit = 50 } = req.query;
-    const offset = (page - 1) * limit;
+    const { limit = 30, before } = req.query; // cursor
+    const lim = parseInt(limit);
+
+    const where = { chat_id: chatId };
+    if (before) {
+      where.id = { [Op.lt]: parseInt(before) }; // 'before' se purane messages (chhota id)
+    }
 
     const messages = await ChatMessage.findAll({
-      where: { chat_id: chatId }, 
+      where,
       include: [
         { model: User, as: 'sender', attributes: ['id', 'username', 'userprofile'] },
         { model: Reaction, as: 'reactions', include: [{ model: User, as: 'user', attributes: ['id', 'username'] }] },
@@ -322,13 +327,14 @@ const getMessages = async (req, res) => {
           include: [{ model: User, as: 'sender', attributes: ['id', 'username'] }]
         }
       ],
-      order: [['createdAt', 'DESC']],
-      limit: parseInt(limit),
-      offset: parseInt(offset)
+      order: [['id', 'DESC']],
+      limit: lim + 1 // ek extra fetch karke pata chalega aage aur hain ya nahi
     });
 
-    // NAYA — deleted message ka text frontend ko nahi bhejte, sirf flag bhejte hain
-    const sanitized = messages.map(m => {
+    const hasMore = messages.length > lim;
+    const pageMessages = hasMore ? messages.slice(0, lim) : messages;
+
+    const sanitized = pageMessages.map(m => {
       const msg = m.toJSON();
       if (msg.deleted_at) {
         msg.message_text = null;
@@ -337,12 +343,13 @@ const getMessages = async (req, res) => {
       return msg;
     });
 
-    res.json({ messages: sanitized, page, limit });
+    res.json({ messages: sanitized, hasMore }); // page/limit ki jagah hasMore flag
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
+
 
 const sendMessage = async (req, res) => {
   try {

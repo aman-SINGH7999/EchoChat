@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useLayoutEffect } from 'react'; 
 import { useSelector, useDispatch } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -19,7 +19,7 @@ import { Send as SendIcon, AttachFile as AttachFileIcon, Close as CloseIcon } fr
 import moment from 'moment';
 
 import { chatAPI } from '../services/api';
-import { setMessages, addMessage, setLoading, updateChatPreview, addChat, setSelectedChat, replaceMessage, markMessageFailed, updateMessage, updateChatPreviewOnEdit } from '../redux/slices/chatSlice';
+import { setMessages, addMessage, setLoading, updateChatPreview, addChat, setSelectedChat, replaceMessage, markMessageFailed, updateMessage, updateChatPreviewOnEdit, prependOlderMessages, setHasMoreMessages, setLoadingMoreMessages } from '../redux/slices/chatSlice';
 import { notifyTyping, notifyStopTyping, sendMessage as emitSocketMessage, joinChat, onMessageEdited, offMessageEdited, onMessageDeleted, offMessageDeleted } from '../services/socket';
 import { onUserTyping, onUserStopTyping, offUserTyping, offUserStopTyping, onReactionUpdated, offReactionUpdated } from '../services/socket';
 
@@ -32,7 +32,7 @@ import AddMembersModal from './AddMembersModal';
 function ChatWindow({ chat }) {
   const navigate = useNavigate();
   const dispatch = useDispatch();
-  const { messages, loading } = useSelector(state => state.chat);
+  const { messages, loading, hasMoreMessages, loadingMoreMessages } = useSelector(state => state.chat);
   const { user } = useSelector(state => state.auth);
   const [messageText, setMessageText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
@@ -44,18 +44,20 @@ function ChatWindow({ chat }) {
   const messagesEndRef = useRef(null);
   const typingTimeoutRef = useRef(null);
   const typingClearTimeoutRef = useRef(null);
+  const messagesContainerRef = useRef(null);   
+  const prevScrollHeightRef = useRef(0);       
+  const isPrependingRef = useRef(false);
+
 
   useEffect(() => {
     if (chat?.id) {
+      dispatch(setHasMoreMessages(true));
       loadMessages();
     }else {
       dispatch(setMessages([])); 
     }
   }, [chat?.id]);
 
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
 
   useEffect(() => {
     if (!chat?.id) return;
@@ -122,6 +124,23 @@ function ChatWindow({ chat }) {
     };
   }, [chat?.id, dispatch]);
 
+  // jab purane messages upar jud jaayein, scroll ko wahin rakho jahan user tha (jump na ho)
+  useLayoutEffect(() => {
+    if (isPrependingRef.current && messagesContainerRef.current) {
+      const container = messagesContainerRef.current;
+      container.scrollTop = container.scrollHeight - prevScrollHeightRef.current;
+    }
+  }, [messages]);
+
+  // Purana wala scrollToBottom effect — ab prepend ke case me skip karo
+  useEffect(() => {
+    if (isPrependingRef.current) {
+      isPrependingRef.current = false;  // flag reset, agli baar ke liye
+      return;                            // bottom scroll SKIP karo
+    }
+    scrollToBottom();
+  }, [messages]);
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
@@ -136,19 +155,55 @@ function ChatWindow({ chat }) {
   const loadMessages = async () => {
     dispatch(setLoading(true));
     try {
-      const response = await chatAPI.getMessages(chat.id);
+      const response = await chatAPI.getMessages(chat.id, { limit: 30 }); 
       const withStatus = response.data.messages.reverse().map(m => ({
         ...m,
         status: computeStatus(m, user.id)
       }));
       dispatch(setMessages(withStatus));
+      dispatch(setHasMoreMessages(response.data.hasMore)); 
 
-      // chat open, messages read mark
       chatAPI.markMessagesRead(chat.id).catch(() => {});
     } catch (error) {
       console.error('Error loading messages:', error);
     } finally {
       dispatch(setLoading(false));
+    }
+  };
+
+  // this is used to load older message
+  const loadOlderMessages = async () => {
+    if (!hasMoreMessages || loadingMoreMessages || messages.length === 0) return;
+
+    const container = messagesContainerRef.current;
+    if (!container) return;
+
+    dispatch(setLoadingMoreMessages(true));
+    prevScrollHeightRef.current = container.scrollHeight; 
+    isPrependingRef.current = true;
+
+    try {
+      const oldestId = messages[0].id; 
+      const response = await chatAPI.getMessages(chat.id, { limit: 30, before: oldestId });
+
+      const older = response.data.messages.reverse().map(m => ({
+        ...m,
+        status: computeStatus(m, user.id)
+      }));
+
+      dispatch(prependOlderMessages(older));
+      dispatch(setHasMoreMessages(response.data.hasMore));
+    } catch (error) {
+      console.error('Error loading older messages:', error);
+      isPrependingRef.current = false;
+    } finally {
+      dispatch(setLoadingMoreMessages(false));
+    }
+  };
+
+  const handleScroll = (e) => {
+    if (e.target.scrollTop < 80) {   
+      loadOlderMessages();
     }
   };
 
@@ -294,6 +349,8 @@ function ChatWindow({ chat }) {
 
       {/* Messages */}
       <Box
+        ref={messagesContainerRef}          
+        onScroll={handleScroll} 
         sx={{
           flex: 1,
           overflowY: 'auto',
@@ -304,6 +361,13 @@ function ChatWindow({ chat }) {
           bgcolor: '#fafafa'
         }}
       >
+        {/* NAYA — top par chhota loader jab purane messages fetch ho rahe hon */}
+        {loadingMoreMessages && (
+          <Box display="flex" justifyContent="center" py={1}>
+            <CircularProgress size={22} />
+          </Box>
+        )}
+
         {loading ? (
           <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
             <CircularProgress />
