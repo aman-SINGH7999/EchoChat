@@ -38,6 +38,15 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: true,
         defaultValue: null
       },
+      is_edited: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: false
+      },
+      edited_at: {
+        type: DataTypes.DATE,
+        allowNull: true,
+        defaultValue: null
+      },
       createdAt: {
         type: DataTypes.DATE,
         defaultValue: DataTypes.NOW
@@ -58,6 +67,8 @@ module.exports = (sequelize, DataTypes) => {
     ChatMessage.belongsTo(models.User, { foreignKey: 'sender_id', as: 'sender' });
     ChatMessage.hasMany(models.Reaction, { foreignKey: 'message_id', as: 'reactions' });
     ChatMessage.hasMany(models.MessageStatus, { foreignKey: 'message_id', as: 'statuses' });
+    ChatMessage.hasMany(models.MessageEditHistory, { foreignKey: 'message_id', as: 'edit_history' });
+    ChatMessage.belongsTo(models.ChatMessage, { foreignKey: 'reply_to', as: 'repliedMessage' });
   };
 
   return ChatMessage;

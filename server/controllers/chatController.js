@@ -100,7 +100,14 @@ const sendMessageUnified = async (req, res) => {
 
     // COMMIT ke BAAD hi socket/notification kaam karo (transaction ke bahar)
     const messageWithDetails = await ChatMessage.findByPk(message.id, {
-      include: [{ model: User, as: 'sender', attributes: ['id', 'username', 'userprofile'] }]
+      include: [
+        { model: User, as: 'sender', attributes: ['id', 'username', 'userprofile'] },
+        {
+          model: ChatMessage, as: 'repliedMessage',
+          attributes: ['id', 'message_text', 'sender_id', 'deleted_at'],
+          include: [{ model: User, as: 'sender', attributes: ['id', 'username'] }]
+        }
+      ]
     });
 
     const io = req.app.get('io');
@@ -301,22 +308,36 @@ const getMessages = async (req, res) => {
   try {
     const { chatId } = req.params;
     const { page = 1, limit = 50 } = req.query;
-
     const offset = (page - 1) * limit;
 
     const messages = await ChatMessage.findAll({
-      where: { chat_id: chatId, deleted_at: null },
+      where: { chat_id: chatId }, 
       include: [
         { model: User, as: 'sender', attributes: ['id', 'username', 'userprofile'] },
         { model: Reaction, as: 'reactions', include: [{ model: User, as: 'user', attributes: ['id', 'username'] }] },
-        { model: MessageStatus, as: 'statuses' }   // <-- NAYA
+        { model: MessageStatus, as: 'statuses' },
+        {
+          model: ChatMessage, as: 'repliedMessage',
+          attributes: ['id', 'message_text', 'sender_id', 'deleted_at'],
+          include: [{ model: User, as: 'sender', attributes: ['id', 'username'] }]
+        }
       ],
       order: [['createdAt', 'DESC']],
       limit: parseInt(limit),
       offset: parseInt(offset)
     });
 
-    res.json({ messages, page, limit });
+    // NAYA — deleted message ka text frontend ko nahi bhejte, sirf flag bhejte hain
+    const sanitized = messages.map(m => {
+      const msg = m.toJSON();
+      if (msg.deleted_at) {
+        msg.message_text = null;
+        msg.is_deleted = true;
+      }
+      return msg;
+    });
+
+    res.json({ messages: sanitized, page, limit });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Server error', error: error.message });
@@ -368,7 +389,14 @@ const sendMessage = async (req, res) => {
     }
 
     const messageWithDetails = await ChatMessage.findByPk(message.id, {
-      include: [{ model: User, as: 'sender', attributes: ['id', 'username', 'userprofile'] }]
+      include: [
+        { model: User, as: 'sender', attributes: ['id', 'username', 'userprofile'] },
+        {
+          model: ChatMessage, as: 'repliedMessage',
+          attributes: ['id', 'message_text', 'sender_id', 'deleted_at'],
+          include: [{ model: User, as: 'sender', attributes: ['id', 'username'] }]
+        }
+      ]
     });
 
     const io = req.app.get('io');
@@ -406,55 +434,6 @@ const sendMessage = async (req, res) => {
     res.status(201).json({
       message: 'Message sent successfully',
       data: messageWithDetails
-    });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Server error', error: error.message });
-  }
-};
-
-const deleteMessage = async (req, res) => {
-  try {
-    const { messageId } = req.params;
-    const userId = req.user.id;
-
-    const message = await ChatMessage.findByPk(messageId);
-    if (!message) {
-      return res.status(404).json({ message: 'Message not found' });
-    }
-
-    if (message.sender_id !== userId) {
-      return res.status(403).json({ message: 'You can only delete your own messages' });
-    }
-
-    await message.update({ deleted_at: new Date() });
-
-    res.json({ message: 'Message deleted successfully' });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Server error', error: error.message });
-  }
-};
-
-const addReaction = async (req, res) => {
-  try {
-    const { messageId } = req.params;
-    const userId = req.user.id;
-    const { emoji } = req.body;
-
-    if (!emoji) {
-      return res.status(400).json({ message: 'Emoji is required' });
-    }
-
-    const reaction = await Reaction.create({
-      message_id: messageId,
-      user_id: userId,
-      emoji
-    });
-
-    res.status(201).json({
-      message: 'Reaction added successfully',
-      reaction
     });
   } catch (error) {
     console.error(error);
@@ -511,7 +490,5 @@ module.exports = {
   getChat,
   getMessages,
   sendMessage,
-  deleteMessage,
-  addReaction,
   markMessagesRead
 }

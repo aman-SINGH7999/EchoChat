@@ -15,13 +15,13 @@ import {
   Toolbar,
   Badge
 } from '@mui/material';
-import { Send as SendIcon, AttachFile as AttachFileIcon } from '@mui/icons-material';
+import { Send as SendIcon, AttachFile as AttachFileIcon, Close as CloseIcon } from '@mui/icons-material';
 import moment from 'moment';
 
 import { chatAPI } from '../services/api';
-import { setMessages, addMessage, setLoading, updateChatPreview, addChat, setSelectedChat, replaceMessage, markMessageFailed } from '../redux/slices/chatSlice';
-import { notifyTyping, notifyStopTyping, sendMessage as emitSocketMessage, joinChat } from '../services/socket';
-import { onUserTyping, onUserStopTyping, offUserTyping, offUserStopTyping } from '../services/socket';
+import { setMessages, addMessage, setLoading, updateChatPreview, addChat, setSelectedChat, replaceMessage, markMessageFailed, updateMessage, updateChatPreviewOnEdit } from '../redux/slices/chatSlice';
+import { notifyTyping, notifyStopTyping, sendMessage as emitSocketMessage, joinChat, onMessageEdited, offMessageEdited, onMessageDeleted, offMessageDeleted } from '../services/socket';
+import { onUserTyping, onUserStopTyping, offUserTyping, offUserStopTyping, onReactionUpdated, offReactionUpdated } from '../services/socket';
 
 
 
@@ -39,6 +39,7 @@ function ChatWindow({ chat }) {
   const [typingUser, setTypingUser] = useState(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [addMembersOpen, setAddMembersOpen] = useState(false);
+  const [replyingTo, setReplyingTo] = useState(null);
 
   const messagesEndRef = useRef(null);
   const typingTimeoutRef = useRef(null);
@@ -84,6 +85,42 @@ function ChatWindow({ chat }) {
       setTypingUser(null);
     };
   }, [chat?.id, user.id]);
+
+
+  // edit use effect
+  useEffect(() => {
+    if (!chat?.id) return;
+
+    const handleEdited = (updatedMsg) => {
+      if (updatedMsg.chat_id === chat.id) {
+        dispatch(updateMessage(updatedMsg));
+        dispatch(updateChatPreviewOnEdit(updatedMsg));
+      }
+    };
+
+    const handleDeleted = ({ messageId, chatId }) => {
+      if (chatId === chat.id) {
+        dispatch(updateMessage({ id: messageId, message_text: null, is_deleted: true }));
+        dispatch(updateChatPreviewOnEdit({ id: messageId, message_text: null, is_deleted: true }));
+      }
+    };
+
+    const handleReaction = ({ messageId, chatId, reactions }) => { // NAYA
+      if (chatId === chat.id) {
+        dispatch(updateMessage({ id: messageId, reactions }));
+      }
+    };
+
+    onMessageEdited(handleEdited);
+    onMessageDeleted(handleDeleted);
+    onReactionUpdated(handleReaction);
+
+    return () => {
+      offMessageEdited(handleEdited);
+      offMessageDeleted(handleDeleted);
+      offReactionUpdated(handleReaction);
+    };
+  }, [chat?.id, dispatch]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -140,14 +177,14 @@ function ChatWindow({ chat }) {
       let payload;
       if (chat.isTemp) {
         const otherMember = chat.members.find(m => m.user_id !== user.id);
-        payload = { otherUserId: otherMember.user_id, message_text: textToSend, message_type: 'text' };
+        payload = { otherUserId: otherMember.user_id, message_text: textToSend, message_type: 'text', reply_to: replyingTo?.id || null };
       } else {
-        payload = { chatId: chat.id, message_text: textToSend, message_type: 'text' };
+        payload = { chatId: chat.id, message_text: textToSend, message_type: 'text', reply_to: replyingTo?.id || null };
       }
 
       const response = chat.isTemp
         ? await chatAPI.sendMessageUnified(payload)
-        : await chatAPI.sendMessage(chat.id, { message_text: textToSend, message_type: 'text' });
+        : await chatAPI.sendMessage(chat.id, { message_text: textToSend, message_type: 'text', reply_to: replyingTo?.id || null });
 
       const newMessage = { ...response.data.data, status: 'sent' }; // SINGLE TICK
 
@@ -166,6 +203,7 @@ function ChatWindow({ chat }) {
 
       notifyStopTyping(finalChatId, user.id);
       setIsTyping(false);
+      setReplyingTo(null);
     } catch (error) {
       console.error('Error sending message:', error);
       dispatch(markMessageFailed(tempId)); 
@@ -220,20 +258,26 @@ function ChatWindow({ chat }) {
             onClick={() => setDetailsOpen(true)} 
             sx={{ display: 'flex', alignItems: 'center', flex: 1, cursor: 'pointer' }}
           >
-            <Badge
-              overlap="circular"
-              anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-              variant="dot"
-              sx={{
-                '& .MuiBadge-badge': {
-                  backgroundColor: getOnlineStatus() ? '#44b700' : '#bdbdbd'
-                }
-              }}
-            >
+            {chat.chat_type === 'group' ? (
               <Avatar src={getChatAvatar()} alt={getChatName()}>
                 {getChatName()?.charAt(0).toUpperCase()}
               </Avatar>
-            </Badge>
+            ) : (
+              <Badge
+                overlap="circular"
+                anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+                variant="dot"
+                sx={{
+                  '& .MuiBadge-badge': {
+                    backgroundColor: getOnlineStatus() ? '#44b700' : '#bdbdbd'
+                  }
+                }}
+              >
+                <Avatar src={getChatAvatar()} alt={getChatName()}>
+                  {getChatName()?.charAt(0).toUpperCase()}
+                </Avatar>
+              </Badge>
+            )}
             <Typography variant="h6" sx={{ ml: 2, flex: 1 }}>
               {getChatName()}
             </Typography>
@@ -270,6 +314,7 @@ function ChatWindow({ chat }) {
               key={message.id}
               message={message}
               isOwn={message.sender_id === user.id}
+              onReply={setReplyingTo}
             />
           ))
         ) : (
@@ -286,6 +331,16 @@ function ChatWindow({ chat }) {
         <div ref={messagesEndRef} />
       </Box>
 
+
+      {replyingTo && (
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', bgcolor: '#f0f0f0', borderRadius: 1, p: 1, mb: 1 }}>
+          <Box sx={{ borderLeft: '3px solid #2196F3', pl: 1 }}>
+            <Typography variant="caption" fontWeight={600}>{replyingTo.sender?.username}</Typography>
+            <Typography variant="body2" noWrap sx={{ maxWidth: 400 }}>{replyingTo.message_text}</Typography>
+          </Box>
+          <IconButton size="small" onClick={() => setReplyingTo(null)}><CloseIcon fontSize="small" /></IconButton>
+        </Box>
+      )}
       {/* Input */}
       <Paper sx={{ p: 2, borderTop: '1px solid #ddd' }}>
         <form onSubmit={handleSendMessage}>

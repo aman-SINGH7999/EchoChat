@@ -108,7 +108,20 @@ const chatSlice = createSlice({
       if (state.selectedChat?.id === updated.id) {
         state.selectedChat = { ...state.selectedChat, ...updated };
       }
-    }
+    },
+    updateChatPreviewOnEdit: (state, action) => {
+      const { id, message_text, is_deleted, is_edited, reactions } = action.payload;
+      const chat = state.chats.find(c => c.messages && c.messages[0] && c.messages[0].id === id);
+      if (chat) {
+        chat.messages[0] = {
+          ...chat.messages[0],
+          message_text: message_text !== undefined ? message_text : chat.messages[0].message_text,
+          is_deleted: is_deleted !== undefined ? is_deleted : chat.messages[0].is_deleted,
+          is_edited: is_edited !== undefined ? is_edited : chat.messages[0].is_edited,
+          reactions: reactions !== undefined ? reactions : chat.messages[0].reactions
+        };
+      }
+    },
 
   }
 });
@@ -132,7 +145,8 @@ export const {
   replaceMessage, 
   markMessagesAsRead, 
   markMessageFailed,
-  replaceChat
+  replaceChat,
+  updateChatPreviewOnEdit
 } = chatSlice.actions;
 
 export default chatSlice.reducer;

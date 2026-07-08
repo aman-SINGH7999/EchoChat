@@ -173,3 +173,34 @@ export const offGroupUpdated = (callback) => {
   const socket = getSocket();
   socket.off('group_updated', callback);
 };
+
+// message edit and delete
+export const onMessageEdited = (callback) => {
+  const socket = getSocket();
+  socket.on('message_edited', callback);
+};
+export const offMessageEdited = (callback) => {
+  const socket = getSocket();
+  socket.off('message_edited', callback);
+};
+
+export const onMessageDeleted = (callback) => {
+  const socket = getSocket();
+  socket.on('message_deleted', callback);
+};
+export const offMessageDeleted = (callback) => {
+  const socket = getSocket();
+  socket.off('message_deleted', callback);
+};
+
+
+
+// Reactions
+export const onReactionUpdated = (callback) => {
+  const socket = getSocket();
+  socket.on('reaction_updated', callback);
+};
+export const offReactionUpdated = (callback) => {
+  const socket = getSocket();
+  socket.off('reaction_updated', callback);
+};

@@ -15,10 +15,7 @@ router.post('/messages', authenticate, chatController.sendMessageUnified);
 // Message routes
 router.get('/:chatId/messages', authenticate, chatController.getMessages);
 router.post('/:chatId/messages', authenticate, chatController.sendMessage);
-router.delete('/messages/:messageId', authenticate, chatController.deleteMessage);
 router.put('/:chatId/messages/read', authenticate, chatController.markMessagesRead);
 
-// Reaction routes
-router.post('/messages/:messageId/reactions', authenticate, chatController.addReaction);
 
 module.exports = router;

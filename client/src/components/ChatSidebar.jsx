@@ -11,6 +11,9 @@ function ChatSidebar({ chats, selectedChat, onSelectChat, currentUserId }) {
     if (!lastMessage || !lastMessage.message_text) {
       return 'No messages yet';
     }
+    if (lastMessage.is_deleted) {
+      return 'This message was deleted';
+    }
 
     if (chat.chat_type === 'group') {
       const senderName = lastMessage.sender?.username || 'Unknown';
@@ -42,20 +45,26 @@ function ChatSidebar({ chats, selectedChat, onSelectChat, currentUserId }) {
             >
               <ListItemButton onClick={() => onSelectChat(chat)}>
                 <ListItemAvatar>
-                  <Badge
-                    overlap="circular"
-                    anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-                    variant="dot"
-                    sx={{
-                      '& .MuiBadge-badge': {
-                        backgroundColor: isOnline ? '#44b700' : '#bdbdbd'
-                      }
-                    }}
-                  >
+                  {chat.chat_type === 'group' ? (
                     <Avatar src={chatAvatar} alt={chatName}>
                       {chatName?.charAt(0).toUpperCase()}
                     </Avatar>
-                  </Badge>
+                  ) : (
+                    <Badge
+                      overlap="circular"
+                      anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+                      variant="dot"
+                      sx={{
+                        '& .MuiBadge-badge': {
+                          backgroundColor: isOnline ? '#44b700' : '#bdbdbd'
+                        }
+                      }}
+                    >
+                      <Avatar src={chatAvatar} alt={chatName}>
+                        {chatName?.charAt(0).toUpperCase()}
+                      </Avatar>
+                    </Badge>
+                  )}
                 </ListItemAvatar>
                 <ListItemText
                   primary={

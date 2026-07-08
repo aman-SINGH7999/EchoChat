@@ -49,8 +49,6 @@ export const chatAPI = {
   getMessages: (chatId, page = 1, limit = 50) =>
     api.get(`/chats/${chatId}/messages`, { params: { page, limit } }),
   sendMessage: (chatId, data) => api.post(`/chats/${chatId}/messages`, data),
-  deleteMessage: (messageId) => api.delete(`/chats/messages/${messageId}`),
-  addReaction: (messageId, emoji) => api.post(`/chats/messages/${messageId}/reactions`, { emoji }),
   markMessagesRead: (chatId) => api.put(`/chats/${chatId}/messages/read`)
 };
 
@@ -63,6 +61,13 @@ export const groupAPI = {
   promoteToAdmin: (chatId, memberId) => api.put(`/groups/${chatId}/members/${memberId}/promote`),
   deactivateMember: (chatId, memberId) => api.put(`/groups/${chatId}/members/${memberId}/deactivate`),
   reactivateMember: (chatId, memberId) => api.put(`/groups/${chatId}/members/${memberId}/reactivate`)
+};
+
+export const messageAPI = {
+  editMessage: (messageId, message_text) => api.put(`/messages/${messageId}`, { message_text }),
+  deleteMessage: (messageId) => api.delete(`/messages/${messageId}`),
+  getMessageHistory: (messageId) => api.get(`/messages/${messageId}/history`),
+  toggleReaction: (messageId, emoji) => api.post(`/messages/${messageId}/reactions`, { emoji })
 };
 
 export default api;
