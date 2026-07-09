@@ -1,6 +1,7 @@
 import React from 'react';
 import { List, ListItem, ListItemButton, ListItemAvatar, ListItemText, Avatar, Box, Badge, Typography } from '@mui/material';
 import moment from 'moment';
+import { stripHtml } from '../utils/richText';
 
 function ChatSidebar({ chats, selectedChat, onSelectChat, currentUserId }) {
   const formatTime = (date) => {
@@ -8,20 +9,17 @@ function ChatSidebar({ chats, selectedChat, onSelectChat, currentUserId }) {
   };
 
   const getPreviewText = (chat, lastMessage) => {
-    if (!lastMessage || !lastMessage.message_text) {
-      return 'No messages yet';
-    }
-    if (lastMessage.is_deleted) {
-      return 'This message was deleted';
-    }
+  if (!lastMessage || !lastMessage.message_text) return 'No messages yet';
+  if (lastMessage.is_deleted) return 'This message was deleted';
 
-    if (chat.chat_type === 'group') {
-      const senderName = lastMessage.sender?.username || 'Unknown';
-      return `${senderName}: ${lastMessage.message_text}`;
-    }
+  const text = stripHtml(lastMessage.message_text);   
 
-    return lastMessage.message_text;
-  };
+  if (chat.chat_type === 'group') {
+    const senderName = lastMessage.sender?.username || 'Unknown';
+    return `${senderName}: ${text}`;
+  }
+  return text;
+};
 
   return (
     <List sx={{ p: 0 }}>

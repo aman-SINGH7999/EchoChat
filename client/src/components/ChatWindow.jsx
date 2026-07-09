@@ -15,7 +15,7 @@ import {
   Toolbar,
   Badge
 } from '@mui/material';
-import { Send as SendIcon, AttachFile as AttachFileIcon, Close as CloseIcon } from '@mui/icons-material';
+import { Send as SendIcon, AttachFile as AttachFileIcon, Close as CloseIcon, TextFormat as RichToggleIcon } from '@mui/icons-material';
 import moment from 'moment';
 
 import { chatAPI } from '../services/api';
@@ -23,6 +23,8 @@ import { setMessages, addMessage, setLoading, updateChatPreview, addChat, setSel
 import { notifyTyping, notifyStopTyping, sendMessage as emitSocketMessage, joinChat, onMessageEdited, offMessageEdited, onMessageDeleted, offMessageDeleted } from '../services/socket';
 import { onUserTyping, onUserStopTyping, offUserTyping, offUserStopTyping, onReactionUpdated, offReactionUpdated } from '../services/socket';
 
+import RichTextEditor from './RichTextEditor';                        
+import { isHtmlEmpty, stripHtml } from '../utils/richText';  
 
 
 import MessageBubble from './MessageBubble';
@@ -34,12 +36,15 @@ function ChatWindow({ chat }) {
   const dispatch = useDispatch();
   const { messages, loading, hasMoreMessages, loadingMoreMessages } = useSelector(state => state.chat);
   const { user } = useSelector(state => state.auth);
-  const [messageText, setMessageText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [typingUser, setTypingUser] = useState(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [addMembersOpen, setAddMembersOpen] = useState(false);
   const [replyingTo, setReplyingTo] = useState(null);
+
+  const [content, setContent] = useState('');         
+  const [showToolbar, setShowToolbar] = useState(false); 
+  const editorRef = useRef(null);
 
   const messagesEndRef = useRef(null);
   const typingTimeoutRef = useRef(null);
@@ -48,6 +53,7 @@ function ChatWindow({ chat }) {
   const prevScrollHeightRef = useRef(0);       
   const isPrependingRef = useRef(false);
 
+  const canSend = !isHtmlEmpty(content);
 
   useEffect(() => {
     if (chat?.id) {
@@ -56,6 +62,10 @@ function ChatWindow({ chat }) {
     }else {
       dispatch(setMessages([])); 
     }
+
+    setContent('');
+    editorRef.current?.clear();
+    setReplyingTo(null);
   }, [chat?.id]);
 
 
@@ -209,10 +219,10 @@ function ChatWindow({ chat }) {
 
   const handleSendMessage = async (e) => {
     e.preventDefault();
-    if (!messageText.trim()) return;
+    if (!canSend) return;
 
     const tempId = `temp-${Date.now()}`;
-    const textToSend = messageText;
+    const textToSend = content;
 
 
     dispatch(addMessage({
@@ -226,7 +236,9 @@ function ChatWindow({ chat }) {
       status: 'pending',   
       reactions: []
     }));
-    setMessageText('');
+
+    setContent('');
+    editorRef.current?.clear();
 
     try {
       let payload;
@@ -265,18 +277,14 @@ function ChatWindow({ chat }) {
     }
   };
 
-  const handleInputChange = (e) => {
-    setMessageText(e.target.value);
-
-    if (!chat?.id) return; 
-
+  const handleContentChange = (html) => {
+    setContent(html);
+    if (!chat?.id) return;
     if (!isTyping) {
       notifyTyping(chat.id, user.id, user.username);
       setIsTyping(true);
     }
-
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-
     typingTimeoutRef.current = setTimeout(() => {
       notifyStopTyping(chat.id, user.id);
       setIsTyping(false);
@@ -400,37 +408,36 @@ function ChatWindow({ chat }) {
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', bgcolor: '#f0f0f0', borderRadius: 1, p: 1, mb: 1 }}>
           <Box sx={{ borderLeft: '3px solid #2196F3', pl: 1 }}>
             <Typography variant="caption" fontWeight={600}>{replyingTo.sender?.username}</Typography>
-            <Typography variant="body2" noWrap sx={{ maxWidth: 400 }}>{replyingTo.message_text}</Typography>
+            <Typography variant="body2" noWrap sx={{ maxWidth: 400 }}>{stripHtml(replyingTo.message_text)}</Typography>
           </Box>
           <IconButton size="small" onClick={() => setReplyingTo(null)}><CloseIcon fontSize="small" /></IconButton>
         </Box>
       )}
-      {/* Input */}
+      {/* Input — rich editor, toolbar toggle */}
       <Paper sx={{ p: 2, borderTop: '1px solid #ddd' }}>
-        <form onSubmit={handleSendMessage}>
-          <Box display="flex" gap={1}>
-            <TextField
-              fullWidth
+        <Box display="flex" gap={1} alignItems="flex-end">
+          <IconButton onClick={() => setShowToolbar(prev => !prev)} title="Formatting options">
+            <RichToggleIcon color={showToolbar ? 'primary' : 'inherit'} />
+          </IconButton>
+
+          <Box sx={{ flex: 1 }}>
+            <RichTextEditor
+              ref={editorRef}
+              content={content}
+              onChange={handleContentChange}
+              onSubmit={handleSendMessage}
+              showToolbar={showToolbar}   // sirf ye toggle hota hai
               placeholder="Type a message..."
-              value={messageText}
-              onChange={handleInputChange}
-              size="small"
-              multiline
-              maxRows={3}
             />
-            <IconButton color="primary">
-              <AttachFileIcon />
-            </IconButton>
-            <Button
-              variant="contained"
-              color="primary"
-              type="submit"
-              disabled={!messageText.trim()}
-            >
-              <SendIcon />
-            </Button>
           </Box>
-        </form>
+
+          <IconButton color="primary">
+            <AttachFileIcon />
+          </IconButton>
+          <Button variant="contained" color="primary" onClick={handleSendMessage} disabled={!canSend}>
+            <SendIcon />
+          </Button>
+        </Box>
       </Paper>
 
       <ChatDetailsPanel

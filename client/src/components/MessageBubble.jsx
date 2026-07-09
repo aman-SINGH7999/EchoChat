@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   Box, Paper, Typography, Avatar, Menu, MenuItem, IconButton, TextField,
   Dialog, DialogTitle, DialogContent, List, ListItem, ListItemText, Divider
@@ -8,11 +8,14 @@ import {
   DoneAll as ReadIcon, Edit as EditIcon, Check as CheckIcon, Close as CloseIcon
 } from '@mui/icons-material';
 import { Popover } from '@mui/material';
-import { EmojiEmotions as EmojiIcon } from '@mui/icons-material';
+import { EmojiEmotions as EmojiIcon, TextFormat as RichToggleIcon } from '@mui/icons-material';
 import moment from 'moment';
 import { useDispatch } from 'react-redux';
 import { messageAPI } from '../services/api';
 import { updateMessage, updateChatPreviewOnEdit } from '../redux/slices/chatSlice';
+import { sanitizeHtml, stripHtml, isHtmlEmpty } from '../utils/richText';
+import RichTextEditor from './RichTextEditor';
+
 
 
 
@@ -23,12 +26,14 @@ function MessageBubble({ message, isOwn, onReply }) {
   const dispatch = useDispatch();
   const [anchorEl, setAnchorEl] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
-  const [editText, setEditText] = useState(message.message_text || '');
   const [saving, setSaving] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [history, setHistory] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [reactionAnchor, setReactionAnchor] = useState(null);
+  const [editContent, setEditContent] = useState(message.message_text || '');   
+  const [showEditToolbar, setShowEditToolbar] = useState(false); 
+  const editorRef = useRef(null);
 
   const open = Boolean(anchorEl);
   const isDeleted = message.is_deleted || !!message.deleted_at;
@@ -42,13 +47,14 @@ function MessageBubble({ message, isOwn, onReply }) {
   };
 
   const startEdit = () => {
-    setEditText(message.message_text || '');
+    setEditContent(message.message_text || '');   
+    setShowEditToolbar(false);
     setIsEditing(true);
   };
 
   const cancelEdit = () => {
     setIsEditing(false);
-    setEditText(message.message_text || '');
+    setEditContent(message.message_text || '');   
   };
 
   const handlePickReaction = async (emoji) => {
@@ -62,13 +68,13 @@ function MessageBubble({ message, isOwn, onReply }) {
   };
 
   const saveEdit = async () => {
-    if (!editText.trim() || editText.trim() === message.message_text) {
-      setIsEditing(false);
-      return;
-    }
+    const finalText = editorRef.current?.getHTML() || editContent;
+    if (isHtmlEmpty(finalText)) { setIsEditing(false); return; }
+    if (finalText === message.message_text) { setIsEditing(false); return; }
+
     setSaving(true);
     try {
-      const res = await messageAPI.editMessage(message.id, editText.trim());
+      const res = await messageAPI.editMessage(message.id, finalText);
       dispatch(updateMessage(res.data.data));
       dispatch(updateChatPreviewOnEdit(res.data.data));
       setIsEditing(false);
@@ -133,8 +139,8 @@ function MessageBubble({ message, isOwn, onReply }) {
       <Paper
         sx={{
           p: 1.5,
-          maxWidth: '60%',
-          minWidth: isEditing ? 260 : 'auto',
+          maxWidth: isEditing ? '85%' : '60%',  
+          minWidth: isEditing ? 320 : 'auto',
           bgcolor: isDeleted ? '#f0f0f0' : (isOwn ? '#2196F3' : '#e0e0e0'),
           color: isDeleted ? 'text.secondary' : (isOwn ? 'white' : 'black'),
           borderRadius: 2,
@@ -170,20 +176,20 @@ function MessageBubble({ message, isOwn, onReply }) {
           <Typography variant="body2">🚫 This message was deleted</Typography>
         ) : isEditing ? (
           <Box>
-            <TextField
-              fullWidth
-              multiline
-              size="small"
-              value={editText}
-              onChange={(e) => setEditText(e.target.value)}
-              autoFocus
-              sx={{ bgcolor: 'white', borderRadius: 1 }}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); saveEdit(); }
-                if (e.key === 'Escape') cancelEdit();
-              }}
+            <RichTextEditor
+              ref={editorRef}
+              content={editContent}
+              onChange={setEditContent}
+              onSubmit={saveEdit}
+              showToolbar={showEditToolbar}
+              placeholder="Edit message..."
+              minHeight={60}     
+              maxHeight={220}
             />
-            <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 0.5, mt: 0.5 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 0.5, mt: 0.5 }}>
+              <IconButton size="small" onClick={() => setShowEditToolbar(p => !p)} disabled={saving}>
+                <RichToggleIcon fontSize="small" sx={{ color: isOwn ? 'white' : 'inherit' }} />
+              </IconButton>
               <IconButton size="small" onClick={cancelEdit} disabled={saving}>
                 <CloseIcon fontSize="small" sx={{ color: isOwn ? 'white' : 'inherit' }} />
               </IconButton>
@@ -193,7 +199,12 @@ function MessageBubble({ message, isOwn, onReply }) {
             </Box>
           </Box>
         ) : (
-          <Typography variant="body2">{message.message_text}</Typography>
+          // NAYA — hamesha HTML render karo (sanitize karke), chahe formatting use hui ho ya na hui ho
+          <Box
+            className="rte-render"
+            sx={{ fontSize: '0.875rem' }}
+            dangerouslySetInnerHTML={{ __html: sanitizeHtml(message.message_text || '') }}
+          />
         )}
 
         {!isDeleted && !isEditing && (
