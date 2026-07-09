@@ -15,7 +15,7 @@ import {
   Toolbar,
   Badge
 } from '@mui/material';
-import { Send as SendIcon, AttachFile as AttachFileIcon, Close as CloseIcon, TextFormat as RichToggleIcon } from '@mui/icons-material';
+import { Send as SendIcon, AttachFile as AttachFileIcon, Close as CloseIcon, TextFormat as RichToggleIcon, ArrowBack as ArrowBackIcon } from '@mui/icons-material';
 import moment from 'moment';
 
 import { chatAPI } from '../services/api';
@@ -31,7 +31,7 @@ import MessageBubble from './MessageBubble';
 import ChatDetailsPanel from './ChatDetailsPanel';
 import AddMembersModal from './AddMembersModal';
 
-function ChatWindow({ chat }) {
+function ChatWindow({ chat, onBack }) {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const { messages, loading, hasMoreMessages, loadingMoreMessages } = useSelector(state => state.chat);
@@ -64,7 +64,9 @@ function ChatWindow({ chat }) {
     }
 
     setContent('');
-    editorRef.current?.clear();
+    if (editorRef.current) {
+      editorRef.current.clear();
+    }
     setReplyingTo(null);
   }, [chat?.id]);
 
@@ -317,6 +319,11 @@ function ChatWindow({ chat }) {
       {/* Header */}
       <AppBar position="static" color="default" elevation={1}>
         <Toolbar>
+          {onBack && (
+            <IconButton onClick={onBack} sx={{ mr: 1 }} edge="start">
+              <ArrowBackIcon />
+            </IconButton>
+          )}
           <Box
             onClick={() => setDetailsOpen(true)} 
             sx={{ display: 'flex', alignItems: 'center', flex: 1, cursor: 'pointer' }}

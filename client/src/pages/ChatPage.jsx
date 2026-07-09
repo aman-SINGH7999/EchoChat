@@ -5,6 +5,7 @@ import {
   Box, Grid, CircularProgress, TextField, InputAdornment, IconButton,
   Avatar, Menu, MenuItem, ListItemIcon, ListItemText, Divider, Typography
 } from '@mui/material';
+import { useMediaQuery, useTheme } from '@mui/material'; 
 import { Search as SearchIcon, Add as AddIcon, Person as PersonIcon, Logout as LogoutIcon } from '@mui/icons-material';
 
 import { setChats, setSelectedChat, addMessage, updateChatPreview, addChat, markMessagesAsRead } from '../redux/slices/chatSlice';
@@ -23,6 +24,9 @@ function ChatPage() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const { chatId } = useParams(); 
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+
   const { chats, selectedChat, messages, loading } = useSelector(state => state.chat);
   const { user } = useSelector(state => state.auth);
   const [searchQuery, setSearchQuery] = useState('');
@@ -126,6 +130,10 @@ function ChatPage() {
     return () => offGroupUpdated(handleGroupUpdated);
   }, [dispatch]);
 
+  const handleBackToSidebar = () => {
+    dispatch(setSelectedChat(null));
+    navigate('/chats');
+  };
 
   const loadChats = async () => {
     try {
@@ -202,86 +210,103 @@ function ChatPage() {
 
   return (
     <Box sx={{ display: 'flex', height: '100vh', bgcolor: '#f5f5f5' }}>
-      <Box sx={{ width: '35%', bgcolor: 'white', borderRight: '1px solid #ddd', overflowY: 'auto' }}>
-        {/* Header */}
-        <Box sx={{ p: 2, display: 'flex', alignItems: 'center', gap: 1.5, borderBottom: '1px solid #ddd' }}>
-          <IconButton onClick={handleMenuOpen} sx={{ p: 0 }}>
-            <Avatar src={user?.userprofile} alt={user?.username}>
-              {user?.username?.charAt(0).toUpperCase()}
-            </Avatar>
-          </IconButton>
-          <Typography variant="subtitle1" sx={{ flex: 1, fontWeight: 500 }} noWrap>
-            {user?.username}
-          </Typography>
+      {(!isMobile || !selectedChat) && (
+        <Box
+          sx={{
+            width: { xs: '100%', sm: '35%' },   // mobile - full width
+            bgcolor: 'white',
+            borderRight: '1px solid #ddd',
+            overflowY: 'auto'
+          }}
+        >
+          {/* Header */}
+          <Box sx={{ p: 2, display: 'flex', alignItems: 'center', gap: 1.5, borderBottom: '1px solid #ddd' }}>
+            <IconButton onClick={handleMenuOpen} sx={{ p: 0 }}>
+              <Avatar src={user?.userprofile} alt={user?.username}>
+                {user?.username?.charAt(0).toUpperCase()}
+              </Avatar>
+            </IconButton>
+            <Typography variant="subtitle1" sx={{ flex: 1, fontWeight: 500 }} noWrap>
+              {user?.username}
+            </Typography>
 
-          <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={handleMenuClose}>
-            <MenuItem onClick={handleGoToProfile}>
-              <ListItemIcon><PersonIcon fontSize="small" /></ListItemIcon>
-              <ListItemText>Profile</ListItemText>
-            </MenuItem>
-            <Divider />
-            <MenuItem onClick={handleLogout}>
-              <ListItemIcon><LogoutIcon fontSize="small" /></ListItemIcon>
-              <ListItemText>Logout</ListItemText>
-            </MenuItem>
-          </Menu>
-        </Box>
-
-        <Box sx={{ p: 2, borderBottom: '1px solid #ddd', display: 'flex', gap: 1 }}>
-          <TextField
-            placeholder="Search chats..."
-            size="small"
-            fullWidth
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            // onKeyPress={handleSearch}
-            InputProps={{
-              endAdornment: (
-                <InputAdornment position="end">
-                  <IconButton size="small" onClick={handleSearch}>
-                    <SearchIcon />
-                  </IconButton>
-                </InputAdornment>
-              )
-            }}
-          />
-          <IconButton color="primary" onClick={() => setOpenGroupModal(true)}>
-            <AddIcon />
-          </IconButton>
-        </Box>
-
-        {/* Chats List */}
-        {loading ? (
-          <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
-            <CircularProgress />
+            <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={handleMenuClose}>
+              <MenuItem onClick={handleGoToProfile}>
+                <ListItemIcon><PersonIcon fontSize="small" /></ListItemIcon>
+                <ListItemText>Profile</ListItemText>
+              </MenuItem>
+              <Divider />
+              <MenuItem onClick={handleLogout}>
+                <ListItemIcon><LogoutIcon fontSize="small" /></ListItemIcon>
+                <ListItemText>Logout</ListItemText>
+              </MenuItem>
+            </Menu>
           </Box>
-        ) : (
-          <ChatSidebar
-            chats={chats}
-            selectedChat={selectedChat}
-            onSelectChat={handleSelectChat}
-            currentUserId={user?.id}
-          />
-        )}
-      </Box>
 
-      <Box sx={{ width: '65%', display: 'flex', flexDirection: 'column' }}>
-        {selectedChat ? (
-          <ChatWindow chat={selectedChat} />
-        ) : (
-          <Box
-            display="flex"
-            justifyContent="center"
-            alignItems="center"
-            width="100%"
-            height="100%"
-            flexDirection="column"
-            color="#999"
-          >
-            Select a chat to start messaging
+          <Box sx={{ p: 2, borderBottom: '1px solid #ddd', display: 'flex', gap: 1 }}>
+            <TextField
+              placeholder="Search chats..."
+              size="small"
+              fullWidth
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              // onKeyPress={handleSearch}
+              InputProps={{
+                endAdornment: (
+                  <InputAdornment position="end">
+                    <IconButton size="small" onClick={handleSearch}>
+                      <SearchIcon />
+                    </IconButton>
+                  </InputAdornment>
+                )
+              }}
+            />
+            <IconButton color="primary" onClick={() => setOpenGroupModal(true)}>
+              <AddIcon />
+            </IconButton>
           </Box>
-        )}
-      </Box>
+
+          {/* Chats List */}
+          {loading ? (
+            <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
+              <CircularProgress />
+            </Box>
+          ) : (
+            <ChatSidebar
+              chats={chats}
+              selectedChat={selectedChat}
+              onSelectChat={handleSelectChat}
+              currentUserId={user?.id}
+            />
+          )}
+        </Box>
+      )}
+
+      {(!isMobile || selectedChat) && (
+        <Box
+          sx={{
+            width: { xs: '100%', sm: '65%' },   // mobile - full width
+            display: 'flex',
+            flexDirection: 'column'
+          }}
+        >
+          {selectedChat ? (
+            <ChatWindow chat={selectedChat} onBack={isMobile ? handleBackToSidebar : null} />
+          ) : (
+            <Box
+              display="flex"
+              justifyContent="center"
+              alignItems="center"
+              width="100%"
+              height="100%"
+              flexDirection="column"
+              color="#999"
+            >
+              Select a chat to start messaging
+            </Box>
+          )}
+        </Box>
+      )}
 
       {/* Modals */}
       <CreateGroupModal open={openGroupModal} onClose={() => setOpenGroupModal(false)} />

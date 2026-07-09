@@ -38,11 +38,19 @@ const RichTextEditor = forwardRef(function RichTextEditor(
   });
 
   useImperativeHandle(ref, () => ({
-    getHTML: () => editor?.getHTML() || '',
-    isEmpty: () => editor?.isEmpty ?? true,
-    clear: () => editor?.commands.clearContent(),
-    focus: () => editor?.commands.focus()
-  }));
+    getHTML: () => (editor && !editor.isDestroyed ? editor.getHTML() : ''),
+    isEmpty: () => (editor && !editor.isDestroyed ? editor.isEmpty : true),
+    clear: () => {
+      if (editor && !editor.isDestroyed) {
+        editor.commands.clearContent();
+      }
+    },
+    focus: () => {
+      if (editor && !editor.isDestroyed) {
+        editor.commands.focus();
+      }
+    }
+  }), [editor]);
 
   useEffect(() => {
     return () => editor?.destroy();
