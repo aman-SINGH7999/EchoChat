@@ -8,6 +8,7 @@ import {
   DoneAll as ReadIcon, Edit as EditIcon, Check as CheckIcon, Close as CloseIcon
 } from '@mui/icons-material';
 import { Popover } from '@mui/material';
+import { InsertDriveFile as InsertDriveFileIcon } from '@mui/icons-material';
 import { EmojiEmotions as EmojiIcon, TextFormat as RichToggleIcon } from '@mui/icons-material';
 import moment from 'moment';
 import { useDispatch } from 'react-redux';
@@ -15,7 +16,8 @@ import { messageAPI } from '../services/api';
 import { updateMessage, updateChatPreviewOnEdit } from '../redux/slices/chatSlice';
 import { sanitizeHtml, stripHtml, isHtmlEmpty } from '../utils/richText';
 import RichTextEditor from './RichTextEditor';
-
+import FileViewerModal from './FileViewerModal';
+import CommonModal from './CommonModal';
 
 
 
@@ -33,6 +35,7 @@ function MessageBubble({ message, isOwn, onReply }) {
   const [reactionAnchor, setReactionAnchor] = useState(null);
   const [editContent, setEditContent] = useState(message.message_text || '');   
   const [showEditToolbar, setShowEditToolbar] = useState(false); 
+  const [viewerOpen, setViewerOpen] = useState(false);
   const editorRef = useRef(null);
 
   const open = Boolean(anchorEl);
@@ -118,7 +121,7 @@ function MessageBubble({ message, isOwn, onReply }) {
         justifyContent: isOwn ? 'flex-end' : 'flex-start',
         mb: 1,
         alignItems: 'flex-end',
-        '&:hover .message-menu': { opacity: isEditing ? 0 : 1 } // NAYA — poore row par hover se icons dikhenge
+        '&:hover .message-menu': { opacity: isEditing ? 0 : 1 } 
       }}
     >
       {!isOwn && (
@@ -127,7 +130,7 @@ function MessageBubble({ message, isOwn, onReply }) {
         </Avatar>
       )}
 
-      {/* NAYA — sirf apne, non-deleted, text messages par pencil icon */}
+      {/* sirf apne, non-deleted, text messages par pencil icon */}
       {isOwn && !isDeleted && !isEditing && message.message_type === 'text' && (
         <Box className="message-menu" sx={{ mr: 0.5, opacity: 0, transition: 'opacity 0.2s', alignSelf: 'center' }}>
           <IconButton size="small" onClick={startEdit} sx={{ p: 0.5 }}>
@@ -198,8 +201,55 @@ function MessageBubble({ message, isOwn, onReply }) {
               </IconButton>
             </Box>
           </Box>
+        ) : message.message_type === 'image' ? (
+          // image preview
+          <Box>
+            <Box
+              component="img"
+              src={message.file?.file_url}
+              alt={message.file?.file_name || 'image'}
+              sx={{ maxWidth: 260, maxHeight: 260, borderRadius: 1, display: 'block', cursor: 'pointer' }}
+              onClick={() => setViewerOpen(true)}
+            />
+            {message.message_text && (
+              <Typography variant="body2" sx={{ mt: 0.5 }}>{message.message_text}</Typography>
+            )}
+          </Box>
+        ) : message.message_type === 'video' ? (
+          // video player
+          <Box>
+            <Box component="video" controls src={message.file?.file_url} sx={{ maxWidth: 280, borderRadius: 1, display: 'block' }} />
+            {message.message_text && (
+              <Typography variant="body2" sx={{ mt: 0.5 }}>{message.message_text}</Typography>
+            )}
+          </Box>
+        ) : message.message_type === 'audio' ? (
+          // audio player
+          <Box>
+            <Box component="audio" controls src={message.file?.file_url} sx={{ maxWidth: 250 }} />
+            {message.message_text && (
+              <Typography variant="body2" sx={{ mt: 0.5 }}>{message.message_text}</Typography>
+            )}
+          </Box>
+        ) : message.message_type === 'file' ? (
+          //  generic file download card
+          <Box
+            onClick={() => setViewerOpen(true)}
+            sx={{
+              display: 'flex', alignItems: 'center', gap: 1, cursor: 'pointer', color: 'inherit',
+              bgcolor: 'rgba(0,0,0,0.05)', borderRadius: 1, p: 1
+            }}
+          >
+            <InsertDriveFileIcon fontSize="large" />
+            <Box sx={{ overflow: 'hidden' }}>
+              <Typography variant="body2" noWrap sx={{ maxWidth: 180 }}>{message.file?.file_name}</Typography>
+              <Typography variant="caption" color="textSecondary">
+                {message.file?.file_size ? `${(message.file.file_size / 1024).toFixed(1)} KB` : ''}
+              </Typography>
+            </Box>
+          </Box>
         ) : (
-          // NAYA — hamesha HTML render karo (sanitize karke), chahe formatting use hui ho ya na hui ho
+          // hamesha HTML render karo (text messages)
           <Box
             className="rte-render"
             sx={{ fontSize: '0.875rem' }}
@@ -247,7 +297,7 @@ function MessageBubble({ message, isOwn, onReply }) {
         )}
       </Paper>
 
-      {/* NAYA — 3-dot menu: Copy / Reply / History / Delete */}
+      {/* 3-dot menu: Copy / Reply / History / Delete */}
       {!isDeleted && !isEditing && (
         <Box className="message-menu" sx={{ ml: 1, opacity: 0, transition: 'opacity 0.2s', display: 'flex' }}>
           <IconButton size="small" onClick={(e) => setReactionAnchor(e.currentTarget)} sx={{ p: 0.5 }}>
@@ -281,32 +331,59 @@ function MessageBubble({ message, isOwn, onReply }) {
         </Box>
       )}
 
-      {/* NAYA — edit history modal */}
-      <Dialog open={historyOpen} onClose={() => setHistoryOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Edit History</DialogTitle>
-        <DialogContent dividers>
-          {historyLoading ? (
-            <Typography>Loading...</Typography>
-          ) : history.length > 0 ? (
-            <List>
-              {history.map((h, idx) => (
-                <React.Fragment key={h.id}>
-                  <ListItem>
-                    <ListItemText primary={h.previous_text} secondary={moment(h.createdAt).format('DD MMM YYYY, HH:mm')} />
-                  </ListItem>
-                  {idx < history.length - 1 && <Divider />}
-                </React.Fragment>
-              ))}
-              <Divider />
-              <ListItem>
-                <ListItemText primary={message.message_text} secondary="Current version" />
-              </ListItem>
-            </List>
-          ) : (
-            <Typography color="textSecondary">No history found</Typography>
-          )}
-        </DialogContent>
-      </Dialog>
+      {/* edit history modal */}
+      <CommonModal
+        open={historyOpen}
+        onClose={() => setHistoryOpen(false)}
+        title="Edit History"
+        hideCancel
+        maxWidth="sm"
+      >
+        {historyLoading ? (
+          <Typography>Loading...</Typography>
+        ) : history.length > 0 ? (
+          <List>
+            {history.map((h, idx) => (
+              <React.Fragment key={h.id}>
+                <ListItem sx={{ flexDirection: 'column', alignItems: 'flex-start' }}>
+                  <Box
+                    className="rte-render"
+                    sx={{ fontSize: '0.875rem', width: '100%' }}
+                    dangerouslySetInnerHTML={{ __html: sanitizeHtml(h.previous_text) }}
+                  />
+                  <Typography variant="caption" color="textSecondary" sx={{ mt: 0.5 }}>
+                    {moment(h.createdAt).format('DD MMM YYYY, HH:mm')}
+                  </Typography>
+                </ListItem>
+                <Divider />
+              </React.Fragment>
+            ))}
+            <ListItem sx={{ flexDirection: 'column', alignItems: 'flex-start' }}>
+              <Box
+                className="rte-render"
+                sx={{ fontSize: '0.875rem', width: '100%' }}
+                dangerouslySetInnerHTML={{ __html: sanitizeHtml(message.message_text || '') }}
+              />
+              <Typography variant="caption" color="textSecondary" sx={{ mt: 0.5 }}>
+                Current version
+              </Typography>
+            </ListItem>
+          </List>
+        ) : (
+          <Typography color="textSecondary">No history found</Typography>
+        )}
+      </CommonModal>
+
+      {(message.message_type === 'image' || message.message_type === 'file') && (
+        <FileViewerModal
+          open={viewerOpen}
+          onClose={() => setViewerOpen(false)}
+          fileUrl={message.file?.file_url}
+          fileName={message.file?.file_name}
+          fileType={message.file?.file_type}
+          mode="view"
+        />
+      )}
     </Box>
   );
 }

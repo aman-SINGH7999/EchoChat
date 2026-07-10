@@ -69,4 +69,13 @@ export const messageAPI = {
   toggleReaction: (messageId, emoji) => api.post(`/messages/${messageId}/reactions`, { emoji })
 };
 
+export const fileAPI = {
+  upload: (formData, onUploadProgress) => api.post('/files/upload', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    onUploadProgress
+  })
+};
+
+
+
 export default api;

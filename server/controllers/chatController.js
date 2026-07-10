@@ -1,4 +1,4 @@
-const { ChatRoom, ChatMessage, ChatMember, ChatNotification, User, Reaction, MessageStatus } = require('../models');
+const { ChatRoom, ChatMessage, ChatMember, ChatNotification, User, Reaction, MessageStatus, File } = require('../models');
 const { Op } = require('sequelize');
 const { getOnlineUsers, joinUserToRoom } = require('../socket/socketHandler');
 
@@ -102,6 +102,7 @@ const sendMessageUnified = async (req, res) => {
     const messageWithDetails = await ChatMessage.findByPk(message.id, {
       include: [
         { model: User, as: 'sender', attributes: ['id', 'username', 'userprofile'] },
+        { model: File, as: 'file' },
         {
           model: ChatMessage, as: 'repliedMessage',
           attributes: ['id', 'message_text', 'sender_id', 'deleted_at'],
@@ -321,6 +322,7 @@ const getMessages = async (req, res) => {
         { model: User, as: 'sender', attributes: ['id', 'username', 'userprofile'] },
         { model: Reaction, as: 'reactions', include: [{ model: User, as: 'user', attributes: ['id', 'username'] }] },
         { model: MessageStatus, as: 'statuses' },
+        { model: File, as: 'file' },
         {
           model: ChatMessage, as: 'repliedMessage',
           attributes: ['id', 'message_text', 'sender_id', 'deleted_at'],
@@ -398,6 +400,7 @@ const sendMessage = async (req, res) => {
     const messageWithDetails = await ChatMessage.findByPk(message.id, {
       include: [
         { model: User, as: 'sender', attributes: ['id', 'username', 'userprofile'] },
+        { model: File, as: 'file' },
         {
           model: ChatMessage, as: 'repliedMessage',
           attributes: ['id', 'message_text', 'sender_id', 'deleted_at'],

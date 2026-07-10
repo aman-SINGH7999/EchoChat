@@ -16,6 +16,7 @@ const userRoutes = require('./routes/userRoutes');
 const chatRoutes = require('./routes/chatRoutes');
 const groupRoutes = require('./routes/groupRoutes');
 const messageRoutes = require('./routes/messageRoutes');
+const fileRoutes = require('./routes/fileRoutes');
 
 
 const app = express();
@@ -49,6 +50,7 @@ app.use('/api/users', userRoutes);
 app.use('/api/chats', chatRoutes);
 app.use('/api/groups', groupRoutes);
 app.use('/api/messages', messageRoutes);
+app.use('/api/files', fileRoutes);
 
 // Health check
 app.get('/health', (req, res) => {

@@ -18,13 +18,14 @@ import {
 import { Send as SendIcon, AttachFile as AttachFileIcon, Close as CloseIcon, TextFormat as RichToggleIcon, ArrowBack as ArrowBackIcon } from '@mui/icons-material';
 import moment from 'moment';
 
-import { chatAPI } from '../services/api';
+import { chatAPI, fileAPI } from '../services/api';
 import { setMessages, addMessage, setLoading, updateChatPreview, addChat, setSelectedChat, replaceMessage, markMessageFailed, updateMessage, updateChatPreviewOnEdit, prependOlderMessages, setHasMoreMessages, setLoadingMoreMessages } from '../redux/slices/chatSlice';
 import { notifyTyping, notifyStopTyping, sendMessage as emitSocketMessage, joinChat, onMessageEdited, offMessageEdited, onMessageDeleted, offMessageDeleted } from '../services/socket';
 import { onUserTyping, onUserStopTyping, offUserTyping, offUserStopTyping, onReactionUpdated, offReactionUpdated } from '../services/socket';
 
 import RichTextEditor from './RichTextEditor';                        
 import { isHtmlEmpty, stripHtml } from '../utils/richText';  
+import FileViewerModal from './FileViewerModal';
 
 
 import MessageBubble from './MessageBubble';
@@ -34,18 +35,22 @@ import AddMembersModal from './AddMembersModal';
 function ChatWindow({ chat, onBack }) {
   const navigate = useNavigate();
   const dispatch = useDispatch();
+
   const { messages, loading, hasMoreMessages, loadingMoreMessages } = useSelector(state => state.chat);
   const { user } = useSelector(state => state.auth);
+
   const [isTyping, setIsTyping] = useState(false);
   const [typingUser, setTypingUser] = useState(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [addMembersOpen, setAddMembersOpen] = useState(false);
   const [replyingTo, setReplyingTo] = useState(null);
-
   const [content, setContent] = useState('');         
   const [showToolbar, setShowToolbar] = useState(false); 
-  const editorRef = useRef(null);
+  const [uploadingFile, setUploadingFile] = useState(false);
+  const [pendingFile, setPendingFile] = useState(null);       
+  const [pendingPreviewUrl, setPendingPreviewUrl] = useState('');
 
+  const editorRef = useRef(null);
   const messagesEndRef = useRef(null);
   const typingTimeoutRef = useRef(null);
   const typingClearTimeoutRef = useRef(null);
@@ -157,11 +162,102 @@ function ChatWindow({ chat, onBack }) {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
+
   // message status decide
   const computeStatus = (message, currentUserId) => {
     if (message.sender_id !== currentUserId) return undefined;
     const otherStatus = message.statuses?.find(s => s.user_id !== currentUserId);
     return otherStatus?.status === 'read' ? 'read' : 'sent';
+  };
+
+  const handleFileSelected = async (e) => {
+    const file = e.target.files[0];
+    e.target.value = '';   
+    if (!file) return;
+
+    const previewUrl = URL.createObjectURL(file);
+    setPendingFile(file);
+    setPendingPreviewUrl(previewUrl);
+  };
+
+  // Preview modal ka 
+  const handleConfirmSendFile = async () => {
+    if (!pendingFile) return;
+    const file = pendingFile;
+
+    setUploadingFile(true);
+    const tempId = `temp-${Date.now()}`;
+
+    let localType = 'file';
+    if (file.type.startsWith('image/')) localType = 'image';
+    else if (file.type.startsWith('video/')) localType = 'video';
+    else if (file.type.startsWith('audio/')) localType = 'audio';
+
+    dispatch(addMessage({
+      id: tempId,
+      chat_id: chat.id,
+      sender_id: user.id,
+      sender: { id: user.id, username: user.username, userprofile: user.userprofile },
+      message_text: null,
+      message_type: localType,
+      file: { file_url: pendingPreviewUrl, file_name: file.name, file_type: file.type },
+      createdAt: new Date().toISOString(),
+      status: 'pending',
+      reactions: []
+    }));
+
+    // modal close, state clear 
+    setPendingFile(null);
+    const urlToRevokeLater = pendingPreviewUrl;
+    setPendingPreviewUrl('');
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const uploadRes = await fileAPI.upload(formData);
+      const { file: uploadedFile, message_type } = uploadRes.data;
+
+      let payload;
+      if (chat.isTemp) {
+        const otherMember = chat.members.find(m => m.user_id !== user.id);
+        payload = { otherUserId: otherMember.user_id, message_text: null, message_type, file_id: uploadedFile.id, reply_to: replyingTo?.id || null };
+      } else {
+        payload = { chatId: chat.id, message_text: null, message_type, file_id: uploadedFile.id, reply_to: replyingTo?.id || null };
+      }
+
+      const response = chat.isTemp
+        ? await chatAPI.sendMessageUnified(payload)
+        : await chatAPI.sendMessage(chat.id, { message_text: null, message_type, file_id: uploadedFile.id, reply_to: replyingTo?.id || null });
+
+      const newMessage = { ...response.data.data, status: 'sent' };
+
+      if (chat.isTemp && response.data.chat) {
+        dispatch(addChat(response.data.chat));
+        dispatch(setSelectedChat(response.data.chat));
+        joinChat(response.data.chat.id);
+        navigate(`/chats/${response.data.chat.id}`, { replace: true });
+      }
+
+      const finalChatId = response.data.chat?.id || chat.id;
+
+      dispatch(replaceMessage({ tempId, message: newMessage }));
+      dispatch(updateChatPreview(newMessage));
+      emitSocketMessage(finalChatId, newMessage);
+      setReplyingTo(null);
+    } catch (error) {
+      console.error('Error uploading file:', error);
+      dispatch(markMessageFailed(tempId));
+    } finally {
+      setUploadingFile(false);
+      URL.revokeObjectURL(urlToRevokeLater);
+    }
+  };
+
+  // Preview modal close
+  const handleCancelFilePreview = () => {
+    if (pendingPreviewUrl) URL.revokeObjectURL(pendingPreviewUrl);
+    setPendingFile(null);
+    setPendingPreviewUrl('');
   };
 
   const loadMessages = async () => {
@@ -433,14 +529,28 @@ function ChatWindow({ chat, onBack }) {
               content={content}
               onChange={handleContentChange}
               onSubmit={handleSendMessage}
-              showToolbar={showToolbar}   // sirf ye toggle hota hai
+              showToolbar={showToolbar}
               placeholder="Type a message..."
             />
           </Box>
 
-          <IconButton color="primary">
-            <AttachFileIcon />
-          </IconButton>
+          {/* NAYA — label pattern */}
+          <label htmlFor="chat-file-input">
+            <input
+              id="chat-file-input"
+              type="file"
+              hidden
+              onChange={handleFileSelected}
+            />
+            <IconButton
+              color="primary"
+              component="span"      
+              disabled={uploadingFile}
+            >
+              {uploadingFile ? <CircularProgress size={20} /> : <AttachFileIcon />}
+            </IconButton>
+          </label>
+
           <Button variant="contained" color="primary" onClick={handleSendMessage} disabled={!canSend}>
             <SendIcon />
           </Button>
@@ -458,6 +568,17 @@ function ChatWindow({ chat, onBack }) {
         open={addMembersOpen}
         onClose={() => setAddMembersOpen(false)}
         chat={chat}
+      />
+
+      <FileViewerModal
+        open={!!pendingFile}
+        onClose={handleCancelFilePreview}
+        fileUrl={pendingPreviewUrl}
+        fileName={pendingFile?.name}
+        fileType={pendingFile?.type}
+        mode="preview"
+        onSend={handleConfirmSendFile}
+        sending={uploadingFile}
       />
     </Box>
   );

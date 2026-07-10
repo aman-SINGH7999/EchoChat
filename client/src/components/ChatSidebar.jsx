@@ -9,17 +9,23 @@ function ChatSidebar({ chats, selectedChat, onSelectChat, currentUserId }) {
   };
 
   const getPreviewText = (chat, lastMessage) => {
-  if (!lastMessage || !lastMessage.message_text) return 'No messages yet';
-  if (lastMessage.is_deleted) return 'This message was deleted';
+    if (!lastMessage) return 'No messages yet';
+    if (lastMessage.is_deleted) return 'This message was deleted';
 
-  const text = stripHtml(lastMessage.message_text);   
+    let text;
+    if (lastMessage.message_type === 'image') text = '📷 Photo';
+    else if (lastMessage.message_type === 'video') text = '🎥 Video';
+    else if (lastMessage.message_type === 'audio') text = '🎵 Audio';
+    else if (lastMessage.message_type === 'file') text = `📎 ${lastMessage.file?.file_name || 'File'}`;
+    else if (!lastMessage.message_text) return 'No messages yet';
+    else text = stripHtml(lastMessage.message_text);
 
-  if (chat.chat_type === 'group') {
-    const senderName = lastMessage.sender?.username || 'Unknown';
-    return `${senderName}: ${text}`;
-  }
-  return text;
-};
+    if (chat.chat_type === 'group') {
+      const senderName = lastMessage.sender?.username || 'Unknown';
+      return `${senderName}: ${text}`;
+    }
+    return text;
+  };
 
   return (
     <List sx={{ p: 0 }}>
