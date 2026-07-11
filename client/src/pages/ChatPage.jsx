@@ -283,26 +283,39 @@ function ChatPage() {
       )}
 
       {(!isMobile || selectedChat) && (
-        <Box
-          sx={{
-            width: { xs: '100%', sm: '65%' },   // mobile - full width
-            display: 'flex',
-            flexDirection: 'column'
-          }}
-        >
+        <Box sx={{ width: { xs: '100%', sm: '65%' }, display: 'flex', flexDirection: 'column' }}>
           {selectedChat ? (
             <ChatWindow chat={selectedChat} onBack={isMobile ? handleBackToSidebar : null} />
           ) : (
-            <Box
-              display="flex"
-              justifyContent="center"
-              alignItems="center"
-              width="100%"
-              height="100%"
-              flexDirection="column"
-              color="#999"
-            >
-              Select a chat to start messaging
+            <Box sx={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden' }}>   {/* NAYA wrapper */}
+              
+              {/* background logo */}
+              <Box
+                sx={{
+                  position: 'absolute',
+                  inset: 0,
+                  backgroundImage: 'url(/logo.png)',
+                  backgroundRepeat: 'no-repeat',
+                  backgroundPosition: 'center',
+                  backgroundSize: 'contain',
+                  opacity: 0.05,
+                  pointerEvents: 'none',
+                  zIndex: 0
+                }}
+              />
+
+              <Box
+                display="flex"
+                justifyContent="center"
+                alignItems="center"
+                width="100%"
+                height="100%"
+                flexDirection="column"
+                color="#999"
+                sx={{ position: 'relative', zIndex: 1 }}   
+              >
+                Select a chat to start messaging
+              </Box>
             </Box>
           )}
         </Box>

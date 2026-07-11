@@ -59,9 +59,50 @@ function LoginPage() {
         flexDirection="column"
       >
         <Card sx={{ width: '100%', p: 4, boxShadow: 3 }}>
-          <Typography variant="h4" component="h1" gutterBottom textAlign="center" sx={{ mb: 3 }}>
-            Chat App
-          </Typography>
+          <Box
+            sx={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              mb: 3
+            }}
+          >
+            <Box
+              component="img"
+              src="/logo.png"
+              alt="Charcha"
+              sx={{
+                width: 120,
+                height: 'auto',
+                mb: 1
+              }}
+            />
+
+            <Typography
+              variant="h4"
+              component="h1"
+              sx={{
+                fontWeight: 700,
+                fontFamily: 'Poppins, sans-serif'
+              }}
+            >
+              <Box component="span" sx={{ color: '#1976D2' }}>
+                C
+              </Box>
+              har
+              <Box component="span" sx={{ color: '#FF6B35' }}>
+                c
+              </Box>
+              ha
+            </Typography>
+
+            <Typography
+              variant="body2"
+              color="text.secondary"
+            >
+              Real-Time Conversations
+            </Typography>
+          </Box>
 
           {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 

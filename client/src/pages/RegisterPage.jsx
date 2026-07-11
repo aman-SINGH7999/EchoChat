@@ -70,9 +70,20 @@ function RegisterPage() {
         flexDirection="column"
       >
         <Card sx={{ width: '100%', p: 4, boxShadow: 3 }}>
-          <Typography variant="h4" component="h1" gutterBottom textAlign="center" sx={{ mb: 3 }}>
-            Create Account
-          </Typography>
+          <Box sx={{display:'flex', justifyContent:'center', alignItems:"center", gap:2 }}>
+            <Box
+              component="img"
+              src="/logo.png"
+              alt="Charcha"
+              sx={{
+                width: 50,
+                height: 'auto',
+              }}
+            />
+            <Typography variant="h4" component="h1" gutterBottom textAlign="center"sx={{ mt: 2 }}>
+              Create Account
+            </Typography>
+          </Box>
 
           {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 

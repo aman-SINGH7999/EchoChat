@@ -459,51 +459,64 @@ function ChatWindow({ chat, onBack }) {
       </AppBar>
 
       {/* Messages */}
-      <Box
-        ref={messagesContainerRef}          
-        onScroll={handleScroll} 
-        sx={{
-          flex: 1,
-          overflowY: 'auto',
-          p: 2,
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 1,
-          bgcolor: '#fafafa'
-        }}
-      >
-        {/* NAYA — top par chhota loader jab purane messages fetch ho rahe hon */}
-        {loadingMoreMessages && (
-          <Box display="flex" justifyContent="center" py={1}>
-            <CircularProgress size={22} />
-          </Box>
-        )}
+      <Box sx={{ flex: 1, position: 'relative', overflow: 'hidden' }}>  
 
-        {loading ? (
-          <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
-            <CircularProgress />
-          </Box>
-        ) : messages && messages.length > 0 ? (
-          messages.map((message) => (
-            <MessageBubble
-              key={message.id}
-              message={message}
-              isOwn={message.sender_id === user.id}
-              onReply={setReplyingTo}
-            />
-          ))
-        ) : (
-          <Box
-            display="flex"
-            justifyContent="center"
-            alignItems="center"
-            minHeight="400px"
-            color="#999"
-          >
-            No messages yet. Start the conversation!
-          </Box>
-        )}
-        <div ref={messagesEndRef} />
+        {/* background logo layer */}
+        <Box
+          sx={{
+            position: 'absolute',
+            inset: 0,
+            backgroundImage: 'url(/logo.png)',
+            backgroundRepeat: 'no-repeat',
+            backgroundPosition: 'center',
+            backgroundSize: 'contain',
+            opacity: 0.05,
+            pointerEvents: 'none',   
+            zIndex: 0
+          }}
+        />
+
+        <Box
+          ref={messagesContainerRef}
+          onScroll={handleScroll}
+          sx={{
+            position: 'absolute',   
+            inset: 0,
+            overflowY: 'auto',
+            p: 2,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 1,
+            bgcolor: 'transparent',   
+            zIndex: 1                 
+          }}
+        >
+          {loadingMoreMessages && (
+            <Box display="flex" justifyContent="center" py={1}>
+              <CircularProgress size={22} />
+            </Box>
+          )}
+
+          {loading ? (
+            <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
+              <CircularProgress />
+            </Box>
+          ) : messages && messages.length > 0 ? (
+            messages.map((message) => (
+              <MessageBubble
+                key={message.id}
+                message={message}
+                isOwn={message.sender_id === user.id}
+                onReply={setReplyingTo}
+              />
+            ))
+          ) : (
+            <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px" color="#999">
+              No messages yet. Start the conversation!
+            </Box>
+          )}
+          <div ref={messagesEndRef} />
+        </Box>
       </Box>
 
 
