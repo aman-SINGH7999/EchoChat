@@ -1,12 +1,19 @@
 const nodemailer = require('nodemailer');
+const { transporter } = require('../config/nodemailer');
 
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS
+
+const sendMailWithRetry = async (mailOptions, retries = 2) => {
+  for (let attempt = 1; attempt <= retries + 1; attempt++) {
+    try {
+      await transporter.sendMail(mailOptions);
+      return true;
+    } catch (error) {
+      console.error(`Email attempt ${attempt} failed:`, error.message);
+      if (attempt === retries + 1) return false;   
+      await new Promise(res => setTimeout(res, 1000 * attempt));  
+    }
   }
-});
+};
 
 const sendOTPEmail = async (email, otp) => {
   try {
@@ -23,8 +30,7 @@ const sendOTPEmail = async (email, otp) => {
       `
     };
 
-    await transporter.sendMail(mailOptions);
-    return true;
+    return sendMailWithRetry(mailOptions);
   } catch (error) {
     console.error('Email sending failed:', error);
     return false;
@@ -44,15 +50,37 @@ const sendWelcomeEmail = async (email, username) => {
       `
     };
 
-    await transporter.sendMail(mailOptions);
-    return true;
+    return sendMailWithRetry(mailOptions);
   } catch (error) {
     console.error('Email sending failed:', error);
     return false;
   }
 };
 
+const sendRegistrationOTPEmail = async (email, otp, username) => {
+  try {
+    const mailOptions = {
+      from: process.env.EMAIL_USER,
+      to: email,
+      subject: 'Verify Your Email - Chat App',
+      html: `
+        <h2>Welcome, ${username}!</h2>
+        <p>Please verify your email. Your OTP is:</p>
+        <h3>${otp}</h3>
+        <p>This OTP is valid for 10 minutes.</p>
+      `
+    };
+    return sendMailWithRetry(mailOptions);
+  } catch (error) {
+    console.error('Email sending failed:', error);
+    return false;
+  }
+};
+
+
+
 module.exports = {
   sendOTPEmail,
-  sendWelcomeEmail
+  sendWelcomeEmail,
+  sendRegistrationOTPEmail
 };
