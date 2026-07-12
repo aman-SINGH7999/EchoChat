@@ -4,18 +4,30 @@ const { resend } = require('../config/resend');
 const sendMailWithRetry = async (mailOptions, retries = 2) => {
   for (let attempt = 1; attempt <= retries + 1; attempt++) {
     try {
-      const { error } = await resend.emails.send({
-        from: `"ChatApp Support" <${process.env.EMAIL_USER}>`,
+
+      const response = await resend.emails.send({
+        from: process.env.EMAIL_FROM,
         to: mailOptions.to,
         subject: mailOptions.subject,
         html: mailOptions.html
       });
-      if (error) throw new Error(error.message);
+
+      console.log("RESEND RESPONSE:", JSON.stringify(response, null, 2));
+
+      if (response.error) {
+        throw new Error(response.error.message);
+      }
+
       return true;
+
     } catch (error) {
-      console.error(`Email attempt ${attempt} failed:`, error.message);
-      if (attempt === retries + 1) return false;
-      await new Promise(res => setTimeout(res, 1000 * attempt));
+      console.error(`Email attempt ${attempt} failed:`, error);
+
+      if (attempt === retries + 1) {
+        return false;
+      }
+
+      await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
     }
   }
 };
