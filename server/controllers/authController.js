@@ -137,13 +137,7 @@ const resendRegistrationOTP = async (req, res) => {
     await OTP.destroy({ where: { email } });
     await OTP.create({ email, otp, expires_at: expiresAt });
 
-    console.log("REGISTER HIT");
-    console.log("EMAIL:", email);
-    console.log("USERNAME:", username);
-
     const emailSent = await sendRegistrationOTPEmail(email, otp, username);
-
-    console.log("EMAIL SENT RESULT:", emailSent);
 
     if (!emailSent) {
       await OTP.destroy({ where: { email } });

@@ -3,28 +3,15 @@ const { transporter } = require('../config/nodemailer');
 
 
 const sendMailWithRetry = async (mailOptions, retries = 2) => {
-  console.log("SEND MAIL CALLED");
-  console.log("TO:", mailOptions.to);
-  console.log("SUBJECT:", mailOptions.subject);
-
   for (let attempt = 1; attempt <= retries + 1; attempt++) {
     try {
-      console.log(`EMAIL ATTEMPT ${attempt}`);
       console.log("BEFORE SENDMAIL");
       const result = await transporter.sendMail(mailOptions);
       console.log("AFTER SENDMAIL");
-      console.log("EMAIL SUCCESS");
-      console.log("MESSAGE ID:", result.messageId);
-      console.log("RESPONSE:", result.response);
-
       return true;
 
     } catch (error) {
-
-      console.error(`EMAIL ATTEMPT ${attempt} FAILED`);
-      console.error("ERROR MESSAGE:", error.message);
       console.error("FULL ERROR:", error);
-
       if (attempt === retries + 1) {
         return false;
       }
