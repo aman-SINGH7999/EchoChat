@@ -4,6 +4,9 @@ const { resend } = require('../config/resend');
 const sendMailWithRetry = async (mailOptions, retries = 2) => {
   for (let attempt = 1; attempt <= retries + 1; attempt++) {
     try {
+      console.log("RESEND KEY EXISTS:", !!process.env.RESEND_API_KEY);
+      console.log("EMAIL_FROM:", process.env.EMAIL_FROM);
+      console.log("TO:", mailOptions.to);
 
       const response = await resend.emails.send({
         from: process.env.EMAIL_FROM,
@@ -12,7 +15,7 @@ const sendMailWithRetry = async (mailOptions, retries = 2) => {
         html: mailOptions.html
       });
 
-      console.log("RESEND RESPONSE:", JSON.stringify(response, null, 2));
+      console.log("FULL RESPONSE:", response);
 
       if (response.error) {
         throw new Error(response.error.message);
@@ -76,6 +79,9 @@ const sendWelcomeEmail = async (email, username) => {
 
 const sendRegistrationOTPEmail = async (email, otp, username) => {
   try {
+
+    console.log("SENDING OTP TO:", email);
+
     const mailOptions = {
       from: process.env.EMAIL_USER,
       to: email,
@@ -87,6 +93,9 @@ const sendRegistrationOTPEmail = async (email, otp, username) => {
         <p>This OTP is valid for 10 minutes.</p>
       `
     };
+
+    console.log("MAIL OPTIONS :", mailOptions);
+
     return sendMailWithRetry(mailOptions);
   } catch (error) {
     console.error('Email sending failed:', error);
