@@ -41,14 +41,14 @@ const register = async (req, res) => {
     console.log("EMAIL:", email);
     console.log("USERNAME:", username);
 
-    const emailSent = await sendRegistrationOTPEmail(email, otp, username);
+    // const emailSent = await sendRegistrationOTPEmail(email, otp, username);
 
     console.log("EMAIL SENT RESULT:", emailSent);
 
-    if (!emailSent) {
-      await OTP.destroy({ where: { email } });
-      return res.status(502).json({ message: 'Failed to send OTP email. Please try again in a moment.' });
-    }
+    // if (!emailSent) {
+    //   await OTP.destroy({ where: { email } });
+    //   return res.status(502).json({ message: 'Failed to send OTP email. Please try again in a moment.' });
+    // }
    
     res.status(201).json({
       message: 'OTP sent to your email. Please verify to complete registration.'
