@@ -37,7 +37,7 @@ const register = async (req, res) => {
     });
 
     // Send welcome email
-    await sendWelcomeEmail(email, username);
+    // await sendWelcomeEmail(email, username);
 
     // Generate token
     const token = generateToken(user.id, user.email);
