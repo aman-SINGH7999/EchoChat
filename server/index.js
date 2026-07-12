@@ -51,7 +51,11 @@ app.set('io', io);
 initializeSocket(io);
 
 // Routes
-app.use('/api/auth', authRoutes);
+app.use('/api/auth', (req,res,next)=>{
+  console.log("AUTH ROUTE HIT");
+  next();
+}, authRoutes);
+// app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/chats', chatRoutes);
 app.use('/api/groups', groupRoutes);
