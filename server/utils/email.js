@@ -5,7 +5,7 @@ const sendMailWithRetry = async (mailOptions, retries = 2) => {
   for (let attempt = 1; attempt <= retries + 1; attempt++) {
     try {
       const { error } = await resend.emails.send({
-        from: process.env.EMAIL_FROM,
+        from: `"ChatApp Support" <${process.env.EMAIL_USER}>`,
         to: mailOptions.to,
         subject: mailOptions.subject,
         html: mailOptions.html
